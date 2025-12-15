@@ -1,44 +1,42 @@
 import {validationResult } from "express-validator"
 import Users from "../models/Users.model.js";
-import asyncFunctionWraper from "../utlis/AsyncFunctionWraper.util.js";
-import { ApiError } from "../utlis/ApiErrors.util.js";
-
-
+import { ApiResponse } from "../utlis/ApiResponse.util.js";
+import {env} from "../utlis/getEnvVariable.util.js";
 
 const registration = async(req,res) =>{
     const err = validationResult(req);
     if(err.isEmpty()){
         const found = await Users.findOne({email:req.body.email});
-        
         if(!found){
+            
+            
             const dataToSave = {
                 "email": req.body.email,
                 "firstName" : req.body.firstName,
                 "lastName"  : req.body.lastName,
                 "fullName" : req.body.firstName+' '+req.body.lastName,
                 "password" : req.body.password,
-                "profilePhoto": "url",
+                "profilePhoto": `./${env.UPLOAD_FOLDER}/${req.file.originalname}`,
                 "userType" : req.body.userType,
             }
+            
+            
             try{
-                await Users.insertOne(dataToSave);
-                res.send({"message" : "user Created successfully"})
+                await Users.create(dataToSave);
+                res.status(201).send(new ApiResponse(201,"User created successfully"))
             }catch(err){
-                // console.log(err);
-
-                throw new ApiError(400,"there was a problem while creating a new user")
+                console.log(err);
+                res.status(500).send(new ApiResponse(500,"there was a problem while creating a new user"))
             }   
 
 
-        }else{
-            console.log(new ApiError(401,"User already exsits"));
-            throw new ApiError(401,"User already exsits");
-
+        }else{ 
+            res.status(400).send(new ApiResponse(400,"User already exsits"))
         }
 
     }
     else{
-        throw new ApiError(403,`invalid ${err.errors[0].path}`);
+        res.status(400).send(new ApiResponse(400,`invalid ${err.errors[0].path}`))
     }
     
 }

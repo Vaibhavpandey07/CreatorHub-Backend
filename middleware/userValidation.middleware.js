@@ -1,4 +1,4 @@
-import { body } from "express-validator"
+import { body , query} from "express-validator"
 
 
 const validation = [
@@ -8,4 +8,4 @@ const validation = [
 
     ]
 
-export default validation 
+export {validation} 

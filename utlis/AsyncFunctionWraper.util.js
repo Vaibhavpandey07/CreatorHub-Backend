@@ -6,4 +6,4 @@ const asyncFunctionWraper =(fn) => async()=>{
     }
 }
 
-export default asyncFunctionWraper;
+export {asyncFunctionWraper};
