@@ -73,4 +73,21 @@ const login = async(req,res)=>{
 
 }
 
-export { registration, login };
+
+const logOut = async(req,res)=>{
+    const user = await Users.findById({_id:req.userId})
+    if(!user){
+        return res.status(400).send(new ApiResponse(400,"User does not exsits"))
+    }
+    user.refreshToken = "";
+    await user.save({validateBeforeSave :false});
+
+    const options = {httpOnly :true, secure :true};
+
+    return res.status(200).clearCookie("accessToken", options).clearCookie("refreshToken",options).send(new ApiResponse(200,"Logged Out successfully"))
+    
+
+}
+
+
+export { registration, login , logOut };
