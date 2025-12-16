@@ -14,13 +14,15 @@ const userSchema = new Schema({
     password :{type:String , required :true },
     profilePhoto : {type:String },
     userType :{type:Number , required :true},
+    refreshToken :{type:String}
     
 }, {timestamps:true})
 
 userSchema.pre('save', async function () {
-    if (!this.isModified('password')) return;
 
+    if (!this.isModified('password')) return;
     this.password = await bcrypt.hash(this.password, 10);
+
 });
 
 
@@ -30,24 +32,25 @@ userSchema.methods.isPasswordCorrect = async function(password) {
 }
 
 
-userSchema.methods.generateAccessToken = async function(){
+userSchema.methods.generateAccessToken = function(){
     const payload = {
-        email : this.email,
-        fullName : this.fullName,
-        profilePhoto :this.profilePhoto
+        _id : this._id
     }
-
-    return await jwt.sign(payload , env.ACCESS_TOKEN_SIGN , {expiresIn : env.ACCESS_TOKEN_EXPIRY})
+    
+    return jwt.sign(payload , env.ACCESS_TOKEN_SIGN , {expiresIn : env.ACCESS_TOKEN_EXPIRY});;
 }
 
 
-userSchema.methods.generateRefreshToken = async function(){
+userSchema.methods.generateRefreshToken = function(){
     const payload = {
-        email : this.email,
+        _id : this._id,
     }
-    return await jwt.sign(payload , env.REFRESH_TOKEN_SIGN , {expiresIn : env.REFRESH_TOKEN_EXPIRY})
+    const hash = jwt.sign(payload , env.REFRESH_TOKEN_SIGN , {expiresIn : env.REFRESH_TOKEN_EXPIRY})
+    return hash;
 }
+
 
 const Users = mongoose.model('Users' , userSchema);
 
 export default Users;
+ 
