@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
-import {app} from './app.js'
-import {env} from './utlis/getEnvVariable.util.js'
-import {connection} from './db/connection.db.js'
+import {app} from './src/app.js'
+import {env} from './src/utlis/getEnvVariable.util.js'
+import {connection} from './src/db/connection.db.js'
 
 
 connection().then(()=>{
