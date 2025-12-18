@@ -3,18 +3,24 @@ import { ApiResponse } from "../utlis/ApiResponse.util.js"
 import { env } from "../utlis/getEnvVariable.util.js"
 
 const authToken = async( req, res, next)=>{
-    const token = req.cookies.accessToken || req.header("Authorization").replace("Bearer ", "") 
+    const token = req.cookies.accessToken || req.header("Authorization")?.replace("Bearer ", "") 
     if(!token){
-        res.status(400).send(new ApiResponse(400,"No token found"))
-    }else{
-        const payload = jwt.verify(token , env.ACCESS_TOKEN_SIGN );
-        
-        if(!payload._id){
-            res.status(401).send(new ApiResponse(401,"Token Invalid or expired"))
+        res.status(401).send(new ApiResponse(401,"No token found"))
+    }
+    else{
+        try{
+            const payload = jwt.verify(token , env.ACCESS_TOKEN_SIGN );
+            if(!payload?._id){
+                res.status(401).send(new ApiResponse(401,"Token Invalid"))
+            }
+            req.userId = payload._id;
+            next()
+        }catch(err){
+            if (err instanceof jwt.TokenExpiredError) {
+                return res.status(401).send(new ApiResponse(401,"Token Expired"))
+            }
+            return res.status(401).send(new ApiResponse(401,err.message))
         }
-
-        req.userId = payload._id;
-        next()
     }
 }
 

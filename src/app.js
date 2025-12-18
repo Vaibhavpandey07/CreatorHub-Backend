@@ -3,18 +3,22 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import userRouter from './routes/user.routes.js'
 import cookieParser from 'cookie-parser'
-dotenv.config({path:"./.env"})
 
+dotenv.config({path:"./.env"})
 const app = express();
 
 app.use(cors({
     origin : process.env.ALLOW_ORIGN,
     credentials:true
 }));
+
+
 app.use(express.urlencoded());
 app.use(express.json());
 app.use(cookieParser());
 
+
+app.use('/public', express.static('public'));
 
 app.use('/api/v1/users', userRouter);
 
