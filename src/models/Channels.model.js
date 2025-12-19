@@ -1,10 +1,11 @@
 import mongoose, { Schema } from "mongoose";
+import Users from "./Users.model.js";
 
 const channelSchema = new Schema({
     channelName : {type:String , required : true},
-    user_id :{type : Schema.Types.ObjectId, ref : Users},
+    user_id :{type : Schema.Types.ObjectId, ref : Users, unique:true},
     description :{type:String , required : true},
-    url :{type:String },
+    channelUserName :{type:String, required:true  },
     coverImage :{type:String , required : true},
     contactInfo :{type:String },
     homeTabSetting :{type:Object ,},

@@ -21,7 +21,7 @@ const registration = async(req,res) =>{
                 "fullName" : req.body.firstName+' '+req.body.lastName,
                 "password" : req.body.password,
                 "profilePhoto": `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName?.name}`,
-                "userType" : req.body.userType,
+                "userType" : 1,
                 "refreshToken" : ""
             }
             

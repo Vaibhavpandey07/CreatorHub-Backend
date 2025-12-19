@@ -7,6 +7,7 @@ import path from 'path'
 const storage = multer.diskStorage({
         destination : (req,file,cb)=>{
             let folderName = env.UPLOAD_FOLDER
+            console.log(file.fieldname)
             if(file.fieldname =='profilePhoto'){
                 folderName = env.UPLOAD_PROFILE_PHOTO_FOLDER
             }

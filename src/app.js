@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import userRouter from './routes/user.routes.js'
+import channelRouter from './routes/channel.routes.js'
+
 import cookieParser from 'cookie-parser'
 
 dotenv.config({path:"./.env"})
@@ -21,6 +23,8 @@ app.use(cookieParser());
 app.use('/public', express.static('public'));
 
 app.use('/api/v1/users', userRouter);
+app.use('/api/v1/channels', channelRouter);
+
 
 app.get('/', (req,res)=>{
     res.status(200).send({"message" : "Hello World!"});

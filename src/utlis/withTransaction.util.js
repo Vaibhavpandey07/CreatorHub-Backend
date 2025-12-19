@@ -4,17 +4,21 @@ import mongoose from "mongoose"
 // ACID Properties
 const withTransaction = async function(fn){
     const session = await mongoose.startSession();
-    session.startSession();
+    session.startTransaction();
+    let result = false;
     try{
-        const result = await fn(session);
+        await fn(session);
         await session.commitTransaction();
-        return result;
+        result = true;
     }catch(err){
+        console.log(err);
         await session.abortTransaction();
-        throw err;
+        result = false;
+        
     }finally{
         await session.endSession();
     }
+    return result;
 }
 
 export {withTransaction}
