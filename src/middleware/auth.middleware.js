@@ -11,14 +11,15 @@ const authToken = async( req, res, next)=>{
     else{
         try{
             const payload = jwt.verify(token , env.ACCESS_TOKEN_SIGN );
-
-            const user = await Users.findById(req.userId);
-            if(!user){
-                return res.status(404).send(new ApiResponse(404, "User Does Not exsits"))
-            }  
             if(!payload?._id){
                 return res.status(401).send(new ApiResponse(401,"Token Invalid"))
             }
+            
+            const user = await Users.findById(payload?._id);
+            if(!user){
+                return res.status(404).send(new ApiResponse(404, "User Does Not exsits"))
+            }  
+            
             req.userId = payload._id;
             next()
         }catch(err){

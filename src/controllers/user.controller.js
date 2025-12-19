@@ -210,6 +210,7 @@ const removeUser = async(req,res)=>{
         return res.status(400).send(new ApiResponse(400,"User does not exsits"))
     }
      try{
+        
         const check = await Users.findByIdAndDelete({_id:req.userId})
         if(!check){
             return res.status(500).send(new ApiResponse(500,"User can not be deleted"))
