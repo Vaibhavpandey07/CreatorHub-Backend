@@ -7,7 +7,7 @@ import path from 'path'
 const storage = multer.diskStorage({
         destination : (req,file,cb)=>{
             let folderName = env.UPLOAD_FOLDER
-            console.log(file.fieldname)
+            
             if(file.fieldname =='profilePhoto'){
                 folderName = env.UPLOAD_PROFILE_PHOTO_FOLDER
             }
@@ -17,12 +17,18 @@ const storage = multer.diskStorage({
             else if(file.fieldname == 'video'){
                 folderName = env.UPLOAD_VIDEO_FOLDER
             }
+            else if(file.fieldname == 'thumbnail'){
+                folderName = env.UPLOAD_THUMBNAIL_FOLDER
+            }
 
             cb(null, folderName) 
         },
         filename: (req,file,cb)=>{
             const uniqueName = `${uuid()}-${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`;
-            req.fileName = {name:uniqueName , type:file.fieldname};
+            if(!req.fileName){
+                req.fileName = [];
+            }
+            req.fileName.push({name:uniqueName , type:file.fieldname});
             cb(null,uniqueName)
         }
     })

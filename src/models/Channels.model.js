@@ -6,13 +6,14 @@ const channelSchema = new Schema({
     user_id :{type : Schema.Types.ObjectId, ref : Users, unique:true},
     description :{type:String , required : true},
     channelUserName :{type:String, required:true  },
+    profilePhoto :{type:String,required:true},
     coverImage :{type:String , required : true},
     contactInfo :{type:String },
     homeTabSetting :{type:Object ,},
     totalSubscriberCount :{type:Number , required : true},
     totalViewCount : {type:Number , required : true}
 
-}, {timeStamp:true})
+}, {timeStamps:true})
 
 const Channels = mongoose.model('Channels',channelSchema);
 

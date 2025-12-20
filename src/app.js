@@ -3,6 +3,8 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import userRouter from './routes/user.routes.js'
 import channelRouter from './routes/channel.routes.js'
+import videoRouter from './routes/video.routes.js'
+
 
 import cookieParser from 'cookie-parser'
 
@@ -24,6 +26,8 @@ app.use('/public', express.static('public'));
 
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/channels', channelRouter);
+app.use('/api/v1/videos', videoRouter);
+
 
 
 app.get('/', (req,res)=>{

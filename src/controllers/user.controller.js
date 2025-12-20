@@ -4,15 +4,23 @@ import { ApiResponse } from "../utlis/ApiResponse.util.js";
 import {env} from "../utlis/getEnvVariable.util.js";
 import { generateToken } from "../utlis/generateTokens.util.js";
 import  jwt from "jsonwebtoken"
+import { Channels } from "../models/Channels.model.js";
+import mongoose from "mongoose";
+import { withTransaction } from "../utlis/withTransaction.util.js";
+import fs from "fs/promises"
 
 
 
 const registration = async(req,res) =>{
     const err = validationResult(req);
+    
     if(err.isEmpty()){
         const found = await Users.findOne({email:req.body.email});
         if(!found){
-            
+            let filePath = ""
+            if(req.fileName){
+                filePath = `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`
+            }        
             
             const dataToSave = {
                 "email": req.body.email,
@@ -20,7 +28,7 @@ const registration = async(req,res) =>{
                 "lastName"  : req.body.lastName,
                 "fullName" : req.body.firstName+' '+req.body.lastName,
                 "password" : req.body.password,
-                "profilePhoto": `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName?.name}`,
+                "profilePhoto": filePath,
                 "userType" : 1,
                 "refreshToken" : ""
             }
@@ -36,7 +44,7 @@ const registration = async(req,res) =>{
 
 
         }else{ 
-            res.status(400).send(new ApiResponse(400,"User already exsits"))
+            res.status(400).send(new ApiResponse(400,"User already exist"))
         }
 
     }
@@ -54,7 +62,7 @@ const login = async(req,res)=>{
 
     const user = await Users.findOne({email:req.body.email});
     if(!user){
-        return  res.status(400).send(new ApiResponse(400,`No user exsits with this Email`))
+        return  res.status(400).send(new ApiResponse(400,`No user exist with this Email`))
     }
     const checkPassword = await user.isPasswordCorrect(req.body.password);
     if(!checkPassword){
@@ -78,7 +86,7 @@ const login = async(req,res)=>{
 const logOut = async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exsits"))
+        return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
     user.refreshToken = "";
     await user.save({validateBeforeSave :false});
@@ -94,7 +102,7 @@ const logOut = async(req,res)=>{
 const updateUserDetails = async (req,res) =>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exsits"))
+        return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
     if(!req.body.email && !req.body.firstName && !req.body.lastName){
         return res.status(400).send(new ApiResponse(400,"Please Enter fields to update"))
@@ -157,14 +165,27 @@ const getNewAccesstoken = async(req,res) =>{
 const updateProfilePhoto =async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exsits"))
+        return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
     if(!req.fileName){
         return res.status(400).send(new ApiResponse(400,"Please upload Image"))
     }
     try{
-        await Users.findByIdAndUpdate({_id:req.userId},{$set:{'profilePhoto':`${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName?.name}`}})
-        return res.status(200).send(new ApiResponse(200,"User Profile Photo Updated Successfully"))
+        await withTransaction(async(session)=>{
+            const oldProfilePhoto = user.profilePhoto;
+            await Users.findByIdAndUpdate({_id:req.userId},{$set:{'profilePhoto':`${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`}} , {session})
+            const channel = await Channels.findOne({user_id:new mongoose.Types.ObjectId(req.userId)})
+            if(channel){
+                channel.profilePhoto = `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`;
+                await channel.save({validationBeforeSave :false},{session});
+            }
+            try{
+                await fs.unlink(oldProfilePhoto)
+            }catch(err){
+                console.log(err);
+            }
+            return res.status(200).send(new ApiResponse(200,"User Profile Photo Updated Successfully"))
+        })
     }
     catch(err){
         return res.status(500).send(new ApiResponse(500,err.message))
@@ -175,7 +196,7 @@ const updateProfilePhoto =async(req,res)=>{
 const resetPassword = async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exsits"))
+        return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
     try{
         const password   = req.body.password
@@ -207,7 +228,7 @@ const resetPassword = async(req,res)=>{
 const removeUser = async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exsits"))
+        return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
      try{
         
@@ -226,7 +247,7 @@ const removeUser = async(req,res)=>{
 const getUserDetails = async(req,res)=>{
     const user = await Users.findById({_id:req.userId}).select("-_id -password -refreshToken")
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exsits"))
+        return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
     try{
         return res.status(200).send(new ApiResponse(200,"success",user))
