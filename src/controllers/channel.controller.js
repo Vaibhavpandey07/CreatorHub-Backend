@@ -48,12 +48,12 @@ const createChannel = async(req,res)=>{
         "totalViewCount" : 0
         }
 
-        await withTransaction(async(session)=>{
-            await Channels.create([dataToSave], { session });
+        // await withTransaction(async(session)=>{
+            await Channels.create([dataToSave], { });
             user.userType = 2;
-            await user.save({validationBeforeSave :false} , {session});
+            await user.save({validationBeforeSave :false} , {});
             return res.status(201).send(new ApiResponse(201, "Channel Created Successfully"));
-        })
+        // })
 
 
     }catch(err){
@@ -90,10 +90,10 @@ const updateChannelDetails = async(req,res)=>{
         homeTabSetting : {'sortBy' : req.body?.homeTabSetting?.sortBy ? req.body?.homeTabSetting?.sortBy : channel.homeTabSetting.sortBy },
         }
 
-        await withTransaction(async(session)=>{
-            await Channels.findOneAndUpdate({_id:channel._id},{$set : dataToSave}, { session });
+        // await withTransaction(async(session)=>{
+            await Channels.findOneAndUpdate({_id:channel._id},{$set : dataToSave}, { });
             return res.status(200).send(new ApiResponse(200, "Channel details updated successfully"));
-        })
+        // })
 
 
     }catch(err){

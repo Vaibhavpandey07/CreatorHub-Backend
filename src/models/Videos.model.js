@@ -11,9 +11,7 @@ const videoSchema = new mongoose.Schema({
         required:true,
         ref:Channels
     },
-    videoSegment480p : {type:String , required:true} ,
-    videoSegment720p : {type:String},
-    videoSegment1080p : {type:String} ,
+    videoUrl : {type:String , required:true} ,
     thumbnail : {type:String,required:true},
     title : {type:String,required:true},
     description : {type:String,required:true},
