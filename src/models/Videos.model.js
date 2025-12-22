@@ -1,4 +1,6 @@
 import mongoose, { Schema } from "mongoose";
+import Users from "./Users.model.js";
+import { Channels } from "./Channels.model.js";
 
 const videoSchema = new mongoose.Schema({
     user_id : {
@@ -20,6 +22,9 @@ const videoSchema = new mongoose.Schema({
     dateUploaded : {type:Date,required:true},
     location : {type:String,required:true},
     visibility : {type:String,required:true},
+    views :{type :Number, required:true },
+    likes :{type :Number, required:true },
+    dislikes :{type :Number, required:true }
 })
 
 

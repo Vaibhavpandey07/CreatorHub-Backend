@@ -2,8 +2,8 @@ import mongoose, { Schema } from "mongoose";
 import Users from "./Users.model.js";
 
 const channelSchema = new Schema({
-    channelName : {type:String , required : true},
     user_id :{type : Schema.Types.ObjectId, ref : Users, unique:true},
+    channelName : {type:String , required : true},
     description :{type:String , required : true},
     channelUserName :{type:String, required:true  },
     profilePhoto :{type:String,required:true},

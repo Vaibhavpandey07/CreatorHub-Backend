@@ -55,7 +55,7 @@ class videoToHLS {
             .output(path.join(outputDir, "stream_%v.m3u8"))
             .on("start", command => {
                 this.start = true;
-                console.log("FFmpeg started:", command);
+                // console.log("FFmpeg started:", command);
             })
             .on("progress", progress => {
                 this.progress = progress.percent?.toFixed(2);

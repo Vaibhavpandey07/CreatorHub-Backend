@@ -250,7 +250,15 @@ const getUserDetails = async(req,res)=>{
         return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
     try{
-        return res.status(200).send(new ApiResponse(200,"success",user))
+        const data={
+            "firstName":user.firstName,
+            "lastName" : user.lastName,
+            "email" :user.email,
+            "fullName" :user.fullName,
+            "profilePhoto":user.profilePhoto,
+            "Creator" : user.userType==2?true:false,
+        }
+        return res.status(200).send(new ApiResponse(200,"success",data))
     }
     catch(err){
         return res.status(500).send(new ApiResponse(500,err.message))
