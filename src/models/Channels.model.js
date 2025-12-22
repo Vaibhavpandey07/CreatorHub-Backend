@@ -11,7 +11,7 @@ const channelSchema = new Schema({
     contactInfo :{type:String },
     homeTabSetting :{type:Object ,},
     totalSubscriberCount :{type:Number , required : true},
-    totalViewCount : {type:Number , required : true}
+    totalViewCount : {type:Number , required : true},
 
 }, {timeStamps:true})
 

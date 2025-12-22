@@ -8,7 +8,7 @@ import { Channels } from "../models/Channels.model.js";
 import mongoose from "mongoose";
 import { withTransaction } from "../utlis/withTransaction.util.js";
 import fs from "fs/promises"
-
+import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
 
 
 const registration = async(req,res) =>{
@@ -35,7 +35,8 @@ const registration = async(req,res) =>{
             
             
             try{
-                await Users.create(dataToSave);
+                const user = await Users.create(dataToSave);
+                await UserOtherDetails.create({"user_id" : mongoose.Types.ObjectId(user._id) , "watchHisttory":[],"searchHistory":[] , "likedVideos":[],"disLikedVideos":[],"notification":[] , "subscribedTo":[]})
                 res.status(201).send(new ApiResponse(201,"User created successfully"))
             }catch(err){
                 console.log(err);

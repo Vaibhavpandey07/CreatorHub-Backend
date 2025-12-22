@@ -24,7 +24,8 @@ const videoSchema = new mongoose.Schema({
     visibility : {type:String,required:true},
     views :{type :Number, required:true },
     likes :{type :Number, required:true },
-    dislikes :{type :Number, required:true }
+    dislikes :{type :Number, required:true },
+    tags:[{tyep:String}]
 })
 
 

@@ -5,6 +5,7 @@ const userOtherDetailsSchema = new Schema({
     watchHisttory :[{type:Schema.Types.ObjectId, ref:Videos}],           
     searchHistory :[{type:String}],     
     likedVideos :[{type:Schema.Types.ObjectId, ref:Videos}],
+    disLikedVideos :[{type:Schema.Types.ObjectId, ref:Videos}],
     notification :[{type:String}],
     subscribedTo :[{type:Schema.Types.ObjectId, ref:Channels}],            
 })

@@ -5,6 +5,9 @@ import { ApiResponse } from '../utlis/ApiResponse.util.js';
 import { env } from '../utlis/getEnvVariable.util.js';
 import {withTransaction} from '../utlis/withTransaction.util.js';
 import fs from "fs/promises"
+import { UserOtherDetails } from '../models/UserOtherDetails.model.js';
+import { Subscriptions } from '../models/Subscriptions.model.js';
+
 
 
 
@@ -45,7 +48,8 @@ const createChannel = async(req,res)=>{
         "contactInfo" : req.body.contactInfo,
         "homeTabSetting" :{'sortBy' : req.body.homeTabSetting?.sortBy},
         "totalSubscriberCount" : 0 ,
-        "totalViewCount" : 0
+        "totalViewCount" : 0,
+        
         }
 
         // await withTransaction(async(session)=>{
@@ -133,27 +137,105 @@ const updateChannelCoverImage  = async(req,res)=>{
     }
 }
 
+const subscribeChannel = async(req,res)=>{
+    const userId = new mongoose.Types.ObjectId(req.userId)
+
+    const channel = await Channels.findOne(req.params.userName);
+    if(!channel){
+        return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
+    }
+    if(new mongoose.Types.ObjectId(channel.user_id) === userId){
+        return res.status(401).send(new ApiResponse(401, "You can not subscribe your own channel"));
+    }
+    try{    
+        const userDetails = await UserOtherDetails.findOne({user_id:userId});
+        if(!(new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
+            userDetails.subscribedTo.push(new mongoose.Types.ObjectId(channel._id));
+            channel.totalSubscriberCount+=1;
+            await Subscriptions.create({subscriber_id:userId, channel_id:new mongoose.Types.ObjectId(channel._id)})
+
+            await userDetails.save({validationBeforeSave:false});
+            await channel.save({validationBeforeSave:false});
+            return res.status(200).send(new ApiResponse(200,"Channel Subscribed",{"subscribe":true}));
+        }
+        
+        return res.status(200).send(new ApiResponse(200,"Channel already Subscribed",{"subscribe":true}));
+
+        
+    }catch(err){
+        return res.status(500).send(new ApiResponse(500,err.message));
+    }
+}
+
+const unsubscribeChannel = async(req,res)=>{
+    const userId = new mongoose.Types.ObjectId(req.userId)
+
+    const channel = await Channels.findOne(req.params.userName);
+    if(!channel){
+        return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
+    }
+    if(new mongoose.Types.ObjectId(channel.user_id) === userId){
+        return res.status(401).send(new ApiResponse(401, "You can not unsubscribe your own channel"));
+    }
+    try{    
+        const userDetails = await UserOtherDetails.findOne({user_id:userId});
+        if((new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
+            channel.totalSubscriberCount-=1;
+            await Subscriptions.findOneAndDelete({subscriber_id:userId, channel_id:new mongoose.Types.ObjectId(channel._id)});
+
+            await UserOtherDetails.findOneAndUpdate({user_id:userId},{$pull:{subscribedTo:channel._id}})
+            await channel.save({validationBeforeSave:false});
+            return res.status(200).send(new ApiResponse(200,"Channel Unsubscribed",{"subscribe":false}));
+
+        }
+        return res.status(200).send(new ApiResponse(200,"Channel already Unsubscribed",{"subscribe":false}));
+        
+    }catch(err){
+        return res.status(500).send(new ApiResponse(500,err.message));
+    }
+}
+
+// optionalAuth
 const getChannelDetails = async(req,res)=>{
     // console.log(req.params.userName);
     // const userId = new mongoose.Types.ObjectId(req.userId)
+    try{
 
-    const channel = await Channels.findOne({channelUserName:String(req.params.userName)}).select("-user_id -_id");
-    if(!channel){
-        return res.status(404).send(new ApiResponse(404, "Channel Does Not exist"));
+        
+        const channel = await Channels.findOne({channelUserName:String(req.params.userName)}).select("-user_id -_id");
+        if(!channel){
+            return res.status(404).send(new ApiResponse(404, "Channel Does Not exist"));
+        }
+        const data = {
+            "channelName" : channel.channelName ,
+            "description" : channel.description ,
+            "channelUserName" : channel.channelUserName ,
+            "profilePhoto" : channel.profilePhoto ,
+            "coverImage" : channel.coverImage ,
+            "contactInfo" : channel.contactInfo ,
+            "homeTabSetting" : channel.homeTabSetting ,
+            "totalSubscriberCount" : channel.totalSubscriberCount ,
+            "totalViewCount" : channel.totalViewCount, 
+        };
+        if(req.userId){
+            const userDetails = await UserOtherDetails.findOne({user_id:req.userId});
+            if(userDetails && (new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
+                data.subscribe = true;
+            }else if(!(new mongoose.Types.ObjectId(channel.user_id) === new mongoose.Types.ObjectId(userDetails.user_id))){
+                data.subscribe =false;
+            }
+        }
+        
+        
+        
+        return res.status(200).send(new ApiResponse(200, "Channel Details" , data ));
+    }catch(err){
+        return res.status(500).send(new ApiResponse(500,err.message));
     }
-    const data = {
-        "channelName" : channel.channelName ,
-        "description" : channel.description ,
-        "channelUserName" : channel.channelUserName ,
-        "profilePhoto" : channel.profilePhoto ,
-        "coverImage" : channel.coverImage ,
-        "contactInfo" : channel.contactInfo ,
-        "homeTabSetting" : channel.homeTabSetting ,
-        "totalSubscriberCount" : channel.totalSubscriberCount ,
-        "totalViewCount" : channel.totalViewCount 
-    }
-    return res.status(200).send(new ApiResponse(200, "Channel Details" , data ))
 }
 
 
-export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails}
+
+
+
+export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel}
