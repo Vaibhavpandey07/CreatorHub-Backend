@@ -175,17 +175,39 @@ const likeDislikeVideo = async(req,res)=>{
 
         
 
-        if(new mongoose.Types.ObjectId(video._id) in userDetails.likedVideos || new mongoose.Types.ObjectId(video._id) in userDetails.disLikedVideos ){
+        if( (check && (new mongoose.Types.ObjectId(video._id) in userDetails.likedVideos) )|| (!check && (new mongoose.Types.ObjectId(video._id) in userDetails.disLikedVideos) )){
             return res.status(200).send(new ApiResponse(200,check?"Video already Liked":"Video already disliked"),data={"like":check});
         }
 
-        check?video.likes +=1:video.dislikes+=1;
-        await video.save({validateBeforeSave:false});
-        check?userDetails.likedVideos.push(new mongoose.Types.ObjectId(video._id)):userDetails.disLikedVideos.push(new mongoose.Types.ObjectId(video._id));
-        await userDetails.save({validateBeforeSave:false});
+        else if( !check && (new mongoose.Types.ObjectId(video._id) in userDetails.likedVideos) ){
+            video.likes-=1;
+            video.dislikes+=1;
+            await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$pull:{likedVideos:video._id}, $addToSet: { disLikedVideos: video._id } }, {upsert: false});
+            await video.save({validateBeforeSave:false});
 
-        return res.status(200).send(new ApiResponse(200,check?"Video Liked":"Video disliked"),data={"like":check});
+            return res.status(200).send(new ApiResponse(200,"Video disliked"),data={"like":check});
 
+        }
+        else if( check && (new mongoose.Types.ObjectId(video._id) in userDetails.disLikedVideos) ){
+            video.likes+=1;
+            video.dislikes-=1;
+            await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$addToSet:{likedVideos:video._id}, $pull: { disLikedVideos: video._id } }, {upsert: false});
+            await video.save({validateBeforeSave:false});
+
+            return res.status(200).send(new ApiResponse(200,"Video liked"),data={"like":check});
+
+        }
+        else{
+
+            
+            check?video.likes +=1:video.dislikes+=1;
+            await video.save({validateBeforeSave:false});
+            check?userDetails.likedVideos.push(new mongoose.Types.ObjectId(video._id)):userDetails.disLikedVideos.push(new mongoose.Types.ObjectId(video._id));
+            await userDetails.save({validateBeforeSave:false});
+            
+            return res.status(200).send(new ApiResponse(200,check?"Video Liked":"Video disliked"),data={"like":check});
+            
+        }
 
     }catch(err){
         res.status(500).send(new ApiResponse(500,err.message));

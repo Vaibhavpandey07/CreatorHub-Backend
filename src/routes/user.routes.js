@@ -19,16 +19,6 @@ router.patch('/updateDetails',authToken,updateUserDetails);
 router.patch('/resetPassword',authToken,resetPassword);
 router.patch('/updateProfilePhoto',authToken,upload.single('profilePhoto'),updateProfilePhoto);
 
-
 router.delete('/removeUser',authToken,removeUser);
-
-
-
-
-
-
-
-
-
 
 export default router;
