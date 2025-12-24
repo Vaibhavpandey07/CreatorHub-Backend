@@ -14,6 +14,7 @@ const videoSchema = new mongoose.Schema({
         ref:Channels
     },
     videoUrl : {type:String , required:true} ,
+    videoPath : {type:String , required:true} ,
     thumbnail : {type:String,required:true},
     title : {type:String,required:true},
     description : {type:String,required:true},

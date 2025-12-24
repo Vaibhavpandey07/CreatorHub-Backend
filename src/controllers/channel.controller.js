@@ -7,6 +7,7 @@ import {withTransaction} from '../utlis/withTransaction.util.js';
 import fs from "fs/promises"
 import { UserOtherDetails } from '../models/UserOtherDetails.model.js';
 import { Subscriptions } from '../models/Subscriptions.model.js';
+import { Videos } from '../models/Videos.model.js';
 
 
 
@@ -24,12 +25,12 @@ const createChannel = async(req,res)=>{
         return res.status(400).send(new ApiResponse(400, "channel Already exist"))
         
     }
-    else{
-        const channelWithUserName = await Channels.findOne({channelUserName});
-        if(channelWithUserName){
-            return res.status(400).send(new ApiResponse(400, "channel user Name already taken please try a different User Name"))
-        }
+    
+    const channelWithUserName = await Channels.findOne({channelUserName});
+    if(channelWithUserName){
+        return res.status(400).send(new ApiResponse(400, "channel user Name already taken please try a different User Name"))
     }
+    
     
     
     try{
@@ -151,10 +152,11 @@ const subscribeChannel = async(req,res)=>{
         const userDetails = await UserOtherDetails.findOne({user_id:userId});
         if(!(new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
             userDetails.subscribedTo.push(new mongoose.Types.ObjectId(channel._id));
-            channel.totalSubscriberCount+=1;
+            await userDetails.save({validationBeforeSave:false});
             await Subscriptions.create({subscriber_id:userId, channel_id:new mongoose.Types.ObjectId(channel._id)})
 
-            await userDetails.save({validationBeforeSave:false});
+            channel.totalSubscriberCount = await Subscriptions.countDocuments({channel_id: channel._id});
+
             await channel.save({validationBeforeSave:false});
             return res.status(200).send(new ApiResponse(200,"Channel Subscribed",{"subscribe":true}));
         }
@@ -180,10 +182,12 @@ const unsubscribeChannel = async(req,res)=>{
     try{    
         const userDetails = await UserOtherDetails.findOne({user_id:userId});
         if((new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
-            channel.totalSubscriberCount-=1;
+            
             await Subscriptions.findOneAndDelete({subscriber_id:userId, channel_id:new mongoose.Types.ObjectId(channel._id)});
 
             await UserOtherDetails.findOneAndUpdate({user_id:userId},{$pull:{subscribedTo:channel._id}})
+
+            channel.totalSubscriberCount = await Subscriptions.countDocuments({channel_id: channel._id});
             await channel.save({validationBeforeSave:false});
             return res.status(200).send(new ApiResponse(200,"Channel Unsubscribed",{"subscribe":false}));
 
@@ -234,8 +238,50 @@ const getChannelDetails = async(req,res)=>{
     }
 }
 
+const removeChannel= async(req,res)=>{
+    const user = await Users.findById({_id:req.userId})
+    if(!user){
+        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+    }
+    if(user.userType =1){
+        return res.status(400).send(new ApiResponse(400,"User does not have a channel"))
+    }
+    
+    const channel = await Channels.findOne({user_id:user._id});
+    
+    if(!channel){
+        return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
+    }
+
+
+    try{
+        const channelVideoIds =[];
+        const allVideos = await Videos.find({channel_id:channel._id});
+        allVideos.forEach(async(video)=>{
+            fs.unlink(video.videoPath);
+            fs.unlink(video.thumbnail);
+            await Comments.deleteMany({video_id:video._id});
+            channelVideoIds.push(video._id);
+        })
+        await Videos.deleteMany({_id:{$in :{channelVideoIds}}});
+        await Subscriptions.deleteMany({channel_id:channel._id});
+        fs.unlink(channel.coverImage);
+        await Channels.deleteOne({_id:channel._id});
+        
+        user.userType=1;
+        await user.save({validationBeforeSave:false});
+        
+        return res.status(204).send(new ApiResponse(204,"Channel Deleted Successfully"));
+        
+
+    }catch(err){
+        return res.status(500).send(new ApiResponse(500,err.message));
+    }
 
 
 
+}
 
-export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel}
+
+
+export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel , removeChannel}

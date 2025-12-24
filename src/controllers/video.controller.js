@@ -8,6 +8,7 @@ import path from "path";
 import  jwt from "jsonwebtoken"
 import Users from "../models/Users.model.js"
 import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
+import fs from "fs";
 
 
 
@@ -49,6 +50,7 @@ const uploadVideo = async(req,res)=>{
         "user_id" : new mongoose.Types.ObjectId(channel.user_id) ,
         "channel_id" : new mongoose.Types.ObjectId(channel._id) ,
         "videoUrl" : `${videoOutputPath}/stream_0.m3u8`,
+        "videoPath" : `${videoOutputPath}`,
         "thumbnail" : `${env.UPLOAD_THUMBNAIL_FOLDER}/${thumbnailDetails.name}`,
         "title" : req.body?.title,
         "description" : req.body?.description,
@@ -358,7 +360,67 @@ const getAllVideos = async(req,res)=>{
 }
 
 
+const removeVideo = async(req,res)=>{
+    const userId  = new mongoose.Types.ObjectId(req.userId);
+    const user = await Users.findById({userId});
 
 
+    const videoId = new mongoose.Types.ObjectId(req.params.videoId);
+    const video = await Videos.findById({videoId});
 
-export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos  }
+    
+    if(!video){
+        return res.status(404).send(new ApiResponse(404,"Video does not exist"));
+    }
+
+    const channel = await Channels.findOne({user_id:user._id});
+    
+    if(!channel){
+        return res.status(404).send(new ApiResponse(404,"channel does not exist"));
+    }
+
+    if((video.user_id != user._id) || channel._id != video.channel_id ){
+        return res.status(401).send(new ApiResponse(401,"You are not the Owner of this video"));
+    }
+
+    try{
+
+        
+        if(!channel){
+            return res.status(404).send(new ApiResponse(404,"channel does not exist"));
+        }
+
+        channel.totalViewCount -= video.views;
+        await channel.save({validationBeforeSave:false});
+
+
+        await Comments.deleteMany({video_id:videoId});
+        fs.unlink(video.videoPath, (err) => {
+            if (err) {
+                console.error("Failed to delete original file:", err);
+            } else {
+                console.log("Original file deleted:", video.videoPath);
+            }
+        });
+
+
+        fs.unlink(video.thumbnail, (err) => {
+            if (err) {
+                console.error("Failed to delete original file:", err);
+            } else {
+                console.log("Original file deleted:", video.thumbnail);
+            }
+        });
+
+        await Videos.findOneAndDelete({_id:videoId});
+        return res.status(204).send(new ApiResponse(204,"Video Deleted Successfully"));
+
+    }catch(err){
+        return res.status(500).send(new ApiResponse(500,err.message));
+    }
+
+
+}
+
+
+export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo }

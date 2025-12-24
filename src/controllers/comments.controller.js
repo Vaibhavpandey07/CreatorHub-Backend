@@ -126,16 +126,26 @@ const getCommentReplies = async(req,res)=>{
 }
 
 const removeComment = async(req,res)=>{
-    const videoId = new mongoose.Types.ObjectId(req.params.videoId) ;
-    const video = await Videos.findById(videoId);
+    const userId = new mongoose.Types.ObjectId(req.userId);
     const commentId = new mongoose.Types.ObjectId(req.params?.commentId);
+    const videoId = new mongoose.Types.ObjectId(req.params.videoId) ;
+    
+    const user = await Users.findById(userId);
     const comment = await Comments.findById(commentId); 
-    if(!video ){
-        return res.status(404).send(new ApiResponse(404,"video does not exist"));
-    }
     if(!comment){
         return res.status(404).send(new ApiResponse(404,"Comment does not exist"));
     }
+
+
+    if(user._id != comment.user_id){
+        return res.status(401).send(new ApiResponse(401,"You are not authorized to delete this comment"));
+    }
+
+    const video = await Videos.findById(videoId);
+    if(!video ){
+        return res.status(404).send(new ApiResponse(404,"video does not exist"));
+    }
+
     try{
         if(comment.parentComment_id!=null){
             const parentComment = await Comments.findById(new mongoose.Types.ObjectId(comment.parentComment_id));

@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import { withTransaction } from "../utlis/withTransaction.util.js";
 import fs from "fs/promises"
 import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
+import { Subscriptions } from "../models/Subscriptions.model.js";
 
 
 const registration = async(req,res) =>{
@@ -232,12 +233,33 @@ const removeUser = async(req,res)=>{
         return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
      try{
-        
-        const check = await Users.findByIdAndDelete({_id:req.userId})
-        if(!check){
-            return res.status(500).send(new ApiResponse(500,"User can not be deleted"))
+                
+        const channel = await Channels.findOne({user_id:user._id});
+        if(channel){
+            const channelVideoIds =[];
+            const allVideos = await Videos.find({channel_id:channel._id});
+            allVideos.forEach(async(video)=>{
+                fs.unlink(video.videoPath);
+                fs.unlink(video.thumbnail);
+                await Comments.deleteMany({video_id:video._id});
+                channelVideoIds.push(video._id);
+            })
+            await Videos.deleteMany({_id:{$in :{channelVideoIds}}});
+            await Subscriptions.deleteMany({channel_id:channel._id});
+            fs.unlink(channel.coverImage);
+            await Channels.deleteOne({_id:channel._id});
         }
-        return res.status(200).send(new ApiResponse(200,"User Removed"))
+        await Subscriptions.deleteMany({user_id:user._id});
+        await UserOtherDetails.deleteOne({user_id:user._id});
+        fs.unlink(user.profilePhoto);
+
+        await Users.deleteOne({_id:user._id});
+
+        return res.status(204).send(new ApiResponse(204,"User Deleted succussfully"));
+                    
+
+
+    
     }
     catch(err){
         return res.status(500).send(new ApiResponse(500,err.message))
