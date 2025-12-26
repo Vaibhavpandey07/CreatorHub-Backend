@@ -276,20 +276,13 @@ const removeChannel= async(req,res)=>{
         const allVideos = await Videos.find({channel_id:channel._id});
         const channelVideoIds = await Promise.all( allVideos.map(async(video)=>{
            
-            fs.unlink(video.thumbnail, (err) => {
-                if (err) {
-                    console.error("Failed to delete original file:", err);
-                } else {
-                    console.log("Original file deleted:", video.thumbnail);
-                }
-            });
-            fs.unlink(video.videoPath, (err) => {
-                if (err) {
-                    console.error("Failed to delete original file:", err);
-                } else {
-                    console.log("Original file deleted:", video.videoPath);
-                }
-            });
+            try{
+                fs.rm(video.videoPath, { recursive: true, force: true });
+                fs.unlink(video.thumbnail);
+            }catch(err){
+                console.error("Failed to delete original file:", err);
+    
+            }
             
             await Comments.deleteMany({video_id:video._id});
             return video._id;
@@ -298,13 +291,11 @@ const removeChannel= async(req,res)=>{
         await Videos.deleteMany({_id:{$in :channelVideoIds}});
         await Subscriptions.deleteMany({channel_id:channel._id});
 
-        fs.unlink(channel.coverImage, (err) => {
-            if (err) {
-                console.error("Failed to delete original file:", err);
-            } else {
-                console.log("Original file deleted:",channel.coverImage);
-            }
-        });
+        try{
+            fs.unlink(channel.coverImage)
+        }catch(err){
+            console.error("Failed to delete original file:", err);
+        }
         
         await Channels.deleteOne({_id:channel._id});
         

@@ -268,23 +268,15 @@ const removeVideo = async(req,res)=>{
 
 
         await Comments.deleteMany({video_id:videoId});
-        fs.unlink(video.videoPath, (err) => {
-            if (err) {
-                console.error("Failed to delete original file:", err);
-            } else {
-                console.log("Original file deleted:", video.videoPath);
-            }
-        });
 
+        try{
+            fs.rm(video.videoPath, { recursive: true, force: true });
+            fs.unlink(video.thumbnail);
+        }catch(err){
+                    console.error("Failed to delete original file:", err);
 
-        fs.unlink(video.thumbnail, (err) => {
-            if (err) {
-                console.error("Failed to delete original file:", err);
-            } else {
-                console.log("Original file deleted:", video.thumbnail);
-            }
-        });
-
+        }
+            
         await Videos.findOneAndDelete({_id:videoId});
         return res.status(200).send(new ApiResponse(200,"Video Deleted Successfully"));
 

@@ -91,7 +91,7 @@ const getComments = async(req,res)=>{
             }
         });
 
-        return res.status(200).send(new ApiResponse(200,"all comments",data={"comments":allComments}));
+        return res.status(200).send(new ApiResponse(200,"all comments",{"comments":allComments}));
 
     }catch(err){
         return res.status(500).send(new ApiResponse(500,err.message));
@@ -118,7 +118,7 @@ const getCommentReplies = async(req,res)=>{
             }
         });
 
-        return res.status(200).send(new ApiResponse(200,"all comments",data={"comments":allComments}));
+        return res.status(200).send(new ApiResponse(200,"all comments",{"comments":allComments}));
 
     }catch(err){
         return res.status(500).send(new ApiResponse(500,err.message));

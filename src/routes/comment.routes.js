@@ -10,7 +10,7 @@ router.post('/replyToComment/:videoId/:commentId',authToken,replyToComment);
 router.get('/getComments/:videoId',getComments);
 router.get('/CommentReplies/:videoId/:commentId',getCommentReplies);
 
-router.delete('/deleteComment/:videoId/:commentId',authToken , removeComment);
+router.delete('/removeComment/:videoId/:commentId',authToken , removeComment);
 
 
 export default router; 

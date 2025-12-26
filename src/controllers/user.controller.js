@@ -241,41 +241,33 @@ const removeUser = async(req,res)=>{
         if(channel){
             const allVideos = await Videos.find({channel_id:channel._id});
             const channelVideoIds = await Promise.all(allVideos.map(async(video)=>{
-                    try{fs.unlink(video.videoPath, (err) => {
-                        if (err) {
-                            console.error("Failed to delete original file:", err);
-                        } else {
-                            console.log("Original file deleted:", video.videoPath);
-                        }
-                    });
-            
-            
-                    fs.unlink(video.thumbnail, (err) => {
-                        if (err) {
-                            console.error("Failed to delete original file:", err);
-                        } else {
-                            console.log("Original file deleted:", video.thumbnail);
-                        }
-                    });}catch(err){}
+                    try{
+                        fs.rm(video.videoPath, { recursive: true, force: true });
+                        fs.unlink(video.thumbnail);
+                    }catch(err){
+                        console.error("Failed to delete original file:", err);
+                    }
                     await Comments.deleteMany({video_id:video._id});
                     return video._id;
                 })
             )
             await Videos.deleteMany({_id:{$in :channelVideoIds}});
             await Subscriptions.deleteMany({channel_id:channel._id});
-            try{fs.unlink(channel.coverImage, (err) => {
-                if (err) {
+            try{
+                fs.unlink(channel.coverImage)
+            }catch(err){
                     console.error("Failed to delete original file:", err);
-                } else {
-                    console.log("Original file deleted:", channel.coverImage);
-                }
-            });}catch(err){} 
+            } 
     
             await Channels.deleteOne({_id:channel._id});
         }
         await Subscriptions.deleteMany({user_id:user._id});
         await UserOtherDetails.deleteOne({user_id:user._id});
-        fs.unlink(user.profilePhoto);
+        try{
+            fs.unlink(user.profilePhoto);
+        }catch(err){
+            console.error("Failed to delete original file:", err);
+        }
 
         await Users.deleteOne({_id:user._id});
 
