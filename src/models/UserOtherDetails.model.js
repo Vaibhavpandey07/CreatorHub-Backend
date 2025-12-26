@@ -1,4 +1,8 @@
 import mongoose,{Schema} from "mongoose";
+import Users from "./Users.model.js";
+import { Videos } from "./Videos.model.js";
+import { Channels } from "./Channels.model.js";
+
 
 const userOtherDetailsSchema = new Schema({
     user_id :{type:String, required:true , ref:Users}, 

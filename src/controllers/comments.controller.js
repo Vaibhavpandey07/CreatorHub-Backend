@@ -137,7 +137,7 @@ const removeComment = async(req,res)=>{
     }
 
 
-    if(user._id != comment.user_id){
+    if(!(user._id.equals(comment.user_id))){
         return res.status(401).send(new ApiResponse(401,"You are not authorized to delete this comment"));
     }
 
@@ -155,7 +155,7 @@ const removeComment = async(req,res)=>{
         await Comments.deleteMany({parentComment_id:commentId});
         await Comments.deleteOne({_id:commentId});
 
-        return res.status(204).send(new ApiResponse(204,"Comment Deleted successfully"));
+        return res.status(200).send(new ApiResponse(200,"Comment Deleted successfully"));
 
     }catch(err){
         return res.status(500).send(new ApiResponse(500,err.message));

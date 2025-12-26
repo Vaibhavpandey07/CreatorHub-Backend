@@ -9,6 +9,7 @@ import  jwt from "jsonwebtoken"
 import Users from "../models/Users.model.js"
 import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
 import fs from "fs";
+import { Comments } from "../models/Comments.model.js";
 
 
 
@@ -87,28 +88,29 @@ const uploadVideo = async(req,res)=>{
 
 const updateVideoDetails = async(req,res)=>{
 
-    const videoId = req.body.videoId;
-    const userId = new mongoose.Types.ObjectId(req.userId);
-    const channel = await Channels.findOne({user_id:userId})
-    if(!channel){
-        return res.status(400).send( new ApiResponse(400, "Please create a channel"));
-    }
+    const videoId = req.body?.videoId;
     const video = await Videos.findById(new mongoose.Types.ObjectId(videoId));
 
     if(!video){
         return res.status(400).send( new ApiResponse(400, "Video does not exist"));
     }
+    const userId = new mongoose.Types.ObjectId(req.userId);
+    const channel = await Channels.findOne({user_id:userId})
+    if(!channel){
+        return res.status(400).send( new ApiResponse(400, "Please create a channel"));
+    }
 
 
-    if(!(video.user_id == channel.user_id && channel._id == video.channel_id)){
+
+    if(!(video.user_id.equals(channel.user_id) && channel._id.equals( video.channel_id)) ){
         return res.status(400).send( new ApiResponse(400, "only the owner can change details of the video"));
     }
     else{
         try{
-
+            
 
         video.title = req.body.title?req.body.title:video.title;
-        video.description = req.body.description?req.body.description:video.description;
+        video.description = req.body.description?req.body.description:video.description;;
         video.category = req.body.category?req.body.category:video.category;
         video.language = req.body.language?req.body.language:video.language;
         video.location = req.body.location?req.body.location:video.location;
@@ -140,13 +142,19 @@ const updateThumbnail = async(req,res)=>{
     }
 
 
-    if(!(video.user_id == channel.user_id && channel._id == video.channel_id)){
+    if(!(video.user_id.equals(channel.user_id) && channel._id.equals(video.channel_id)) ){
         return res.status(400).send( new ApiResponse(400, "only the owner can change details of the video"));
     }
     else{
         try{
 
-
+        fs.unlink(video.thumbnail,(err)=>{
+             if (err) {
+                console.error("Failed to delete original file:", err);
+            } else {
+                console.log("Original file deleted:", video.thumbnail);
+            }
+        })
         video.thumbnail = `${env.UPLOAD_THUMBNAIL_FOLDER}/${req.fileName[0].name}`;
 
         await video.save({validationBeforeSave:false});
@@ -163,7 +171,7 @@ const likeDislikeVideo = async(req,res)=>{
     const userId = req.userId;
     const check = req.body.liked;
     try{
-        const videoId = req.params.videoId;
+        const videoId = req.body.videoId;
         
         const video = await Videos.findById(new mongoose.Types.ObjectId(videoId));
         if(!video){
@@ -177,26 +185,33 @@ const likeDislikeVideo = async(req,res)=>{
 
         
 
-        if( (check && (new mongoose.Types.ObjectId(video._id) in userDetails.likedVideos) )|| (!check && (new mongoose.Types.ObjectId(video._id) in userDetails.disLikedVideos) )){
-            return res.status(200).send(new ApiResponse(200,check?"Video already Liked":"Video already disliked"),data={"like":check});
+        if( (check && ( userDetails.likedVideos.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(video._id));}
+        )) )|| (!check && (userDetails.disLikedVideos.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(video._id));}) ))){
+            return res.status(200).send(new ApiResponse(200,check?"Video already Liked":"Video already disliked"),{"like":check});
         }
 
-        else if( !check && (new mongoose.Types.ObjectId(video._id) in userDetails.likedVideos) ){
+        else if( !check && (userDetails.likedVideos.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(video._id));}
+        ) )){
             video.likes-=1;
             video.dislikes+=1;
             await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$pull:{likedVideos:video._id}, $addToSet: { disLikedVideos: video._id } }, {upsert: false});
             await video.save({validateBeforeSave:false});
 
-            return res.status(200).send(new ApiResponse(200,"Video disliked"),data={"like":check});
+            return res.status(200).send(new ApiResponse(200,"Video disliked"),{"like":check});
 
         }
-        else if( check && (new mongoose.Types.ObjectId(video._id) in userDetails.disLikedVideos) ){
+        else if( check && (userDetails.disLikedVideos.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(video._id));})) ){
+
             video.likes+=1;
             video.dislikes-=1;
             await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$addToSet:{likedVideos:video._id}, $pull: { disLikedVideos: video._id } }, {upsert: false});
             await video.save({validateBeforeSave:false});
 
-            return res.status(200).send(new ApiResponse(200,"Video liked"),data={"like":check});
+            return res.status(200).send(new ApiResponse(200,"Video liked"),{"like":check});
 
         }
         else{
@@ -207,15 +222,78 @@ const likeDislikeVideo = async(req,res)=>{
             check?userDetails.likedVideos.push(new mongoose.Types.ObjectId(video._id)):userDetails.disLikedVideos.push(new mongoose.Types.ObjectId(video._id));
             await userDetails.save({validateBeforeSave:false});
             
-            return res.status(200).send(new ApiResponse(200,check?"Video Liked":"Video disliked"),data={"like":check});
+            return res.status(200).send(new ApiResponse(200,check?"Video Liked":"Video disliked"),{"like":check});
             
         }
 
     }catch(err){
+
         res.status(500).send(new ApiResponse(500,err.message));
     }
 }
 
+
+const removeVideo = async(req,res)=>{
+    const userId  = new mongoose.Types.ObjectId(req.userId);
+    const user = await Users.findById(userId);
+
+
+    const videoId = new mongoose.Types.ObjectId(req.body?.videoId);
+    const video = await Videos.findById(videoId);
+
+    
+    if(!video){
+        return res.status(404).send(new ApiResponse(404,"Video does not exist"));
+    }
+
+    const channel = await Channels.findOne({user_id:user._id});
+    
+    if(!channel){
+        return res.status(404).send(new ApiResponse(404,"channel does not exist"));
+    }
+
+    if(!(video.user_id.equals(user._id)) || !(channel._id.equals(video.channel_id))){
+        return res.status(401).send(new ApiResponse(401,"You are not the Owner of this video"));
+    }
+
+    try{
+
+        
+        if(!channel){
+            return res.status(404).send(new ApiResponse(404,"channel does not exist"));
+        }
+
+        channel.totalViewCount -= video.views;
+        await channel.save({validationBeforeSave:false});
+
+
+        await Comments.deleteMany({video_id:videoId});
+        fs.unlink(video.videoPath, (err) => {
+            if (err) {
+                console.error("Failed to delete original file:", err);
+            } else {
+                console.log("Original file deleted:", video.videoPath);
+            }
+        });
+
+
+        fs.unlink(video.thumbnail, (err) => {
+            if (err) {
+                console.error("Failed to delete original file:", err);
+            } else {
+                console.log("Original file deleted:", video.thumbnail);
+            }
+        });
+
+        await Videos.findOneAndDelete({_id:videoId});
+        return res.status(200).send(new ApiResponse(200,"Video Deleted Successfully"));
+
+    }catch(err){
+        return res.status(500).send(new ApiResponse(500,err.message));
+    }
+
+
+}
 
 
 // optional Auth
@@ -247,7 +325,7 @@ const getVideoDetails = async(req,res)=>{
         "dislikes" : video.dislikes,
         "tags":video.tags,
         "channelName" : channel.channelName,
-        "description" : channel.description,
+        "channelDescription" : channel.description,
         "channelUserName" : channel.channelUserName,
         "profilePhoto" :channel.profilePhoto,
         "totalSubscriberCount" :channel.totalSubscriberCount,
@@ -257,18 +335,21 @@ const getVideoDetails = async(req,res)=>{
     
     if(req.userId){
         
-        if(video.visibility.toLowerCase()=="private" && new mongoose.Types.ObjectId(req.userId) != video.user_id){
+        if(video.visibility.toLowerCase()=="private" && (!(new mongoose.Types.ObjectId(req.userId)).equals(video.user_id)) ){
             return res.status(401).send(new ApiResponse(401,"This is a private video"));
         }
 
         const userDetails = await UserOtherDetails.findOne({user_id:new mongoose.Types.ObjectId(req.userId)});
-        if(new mongoose.Types.ObjectId(video._id) in userDetails.likedVideos){
+        if(userDetails.likedVideos.some(id=>{ return id.equals(new mongoose.Types.ObjectId(video._id))})){
             dataToSend.liked = true;
         }
-        else if(new mongoose.Types.ObjectId(video._id) in userDetails.disLikedVideos){
+        else if(userDetails.disLikedVideos.some(id=>{ return id.equals(new mongoose.Types.ObjectId(video._id))})){
             dataToSend.disliked = true;
         }
-        userDetails.watchHisttory.push({"video_id":new mongoose.Types.ObjectId(video._id)});
+        await UserOtherDetails.findOneAndUpdate({_id:userDetails._id},{
+            $addToSet:{watchHisttory : new mongoose.Types.ObjectId(video._id)}
+        })
+        // userDetails.watchHisttory.push();
         await userDetails.save({validationBeforeSave:false});
 
     }
@@ -308,7 +389,7 @@ const getAllVideos = async(req,res)=>{
     let owner = false;
     if(req.userId){
         const user = await  Users.findOne({_id:req.userId});
-        if(user && (new mongoose.Types.ObjectId(user?._id) === new mongoose.Types.ObjectId(channel.user_id))){
+        if(user && ((new mongoose.Types.ObjectId(user?._id)).equals(new mongoose.Types.ObjectId(channel.user_id)))){
             owner = true;
         }
     }
@@ -323,7 +404,7 @@ const getAllVideos = async(req,res)=>{
             
             const data = {
                 "video_id":video._id,
-                "channel_id" : video.channel_id ,
+                // "channel_id" : video.channel_id ,
                 // "videoUrl" : video.videoUrl,
                 "thumbnail" : video.thumbnail,
                 "title" : video.title,
@@ -336,7 +417,7 @@ const getAllVideos = async(req,res)=>{
                 "likes":video.likes,
                 "dislikes" : video.dislikes,
                 "channelName" : channel.channelName,
-                "description" : channel.description,
+                "channelDescription" : channel.description,
                 "channelUserName" : channel.channelUserName,
                 "profilePhoto" :channel.profilePhoto,
                 "totalSubscriberCount" :channel.totalSubscriberCount
@@ -359,68 +440,12 @@ const getAllVideos = async(req,res)=>{
 
 }
 
-
-const removeVideo = async(req,res)=>{
-    const userId  = new mongoose.Types.ObjectId(req.userId);
-    const user = await Users.findById({userId});
-
-
-    const videoId = new mongoose.Types.ObjectId(req.params.videoId);
-    const video = await Videos.findById({videoId});
-
+const searchVideos = async(req,res)=>{
+    const searchQuery = `${req.query.searchQuery}`;
+    const result = await (await Videos.find({$text : {$search : searchQuery, score:{$meta :"textScore"}}})).sort({score:{$meta:"testScore"}}).limit(10);
     
-    if(!video){
-        return res.status(404).send(new ApiResponse(404,"Video does not exist"));
-    }
-
-    const channel = await Channels.findOne({user_id:user._id});
-    
-    if(!channel){
-        return res.status(404).send(new ApiResponse(404,"channel does not exist"));
-    }
-
-    if((video.user_id != user._id) || channel._id != video.channel_id ){
-        return res.status(401).send(new ApiResponse(401,"You are not the Owner of this video"));
-    }
-
-    try{
-
-        
-        if(!channel){
-            return res.status(404).send(new ApiResponse(404,"channel does not exist"));
-        }
-
-        channel.totalViewCount -= video.views;
-        await channel.save({validationBeforeSave:false});
-
-
-        await Comments.deleteMany({video_id:videoId});
-        fs.unlink(video.videoPath, (err) => {
-            if (err) {
-                console.error("Failed to delete original file:", err);
-            } else {
-                console.log("Original file deleted:", video.videoPath);
-            }
-        });
-
-
-        fs.unlink(video.thumbnail, (err) => {
-            if (err) {
-                console.error("Failed to delete original file:", err);
-            } else {
-                console.log("Original file deleted:", video.thumbnail);
-            }
-        });
-
-        await Videos.findOneAndDelete({_id:videoId});
-        return res.status(204).send(new ApiResponse(204,"Video Deleted Successfully"));
-
-    }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
-    }
-
-
+    console.log(result);
+    res.send("ok");
 }
-
 
 export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo }

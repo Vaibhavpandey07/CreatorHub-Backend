@@ -16,10 +16,10 @@ const optionalAuth = async( req, res, next)=>{
             const user = await Users.findById(payload?._id);
             if(user){
                 req.userId = payload?._id;
-                next();
+            }else{
+                req.userId = null;
             }
             
-            req.userId = null;
             next();
         
         }catch(err){

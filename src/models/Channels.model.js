@@ -5,7 +5,7 @@ const channelSchema = new Schema({
     user_id :{type : Schema.Types.ObjectId, ref : Users, unique:true},
     channelName : {type:String , required : true},
     description :{type:String , required : true},
-    channelUserName :{type:String, required:true  },
+    channelUserName :{type:String, required:true ,unique:true },
     profilePhoto :{type:String,required:true},
     coverImage :{type:String , required : true},
     contactInfo :{type:String },
@@ -15,6 +15,11 @@ const channelSchema = new Schema({
 
 }, {timeStamps:true})
 
+
 const Channels = mongoose.model('Channels',channelSchema);
 
+Channels.createIndexes(
+    {channelUserName:1}, 
+    {unique:true}
+)
 export {Channels};

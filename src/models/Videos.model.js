@@ -26,10 +26,15 @@ const videoSchema = new mongoose.Schema({
     views :{type :Number, required:true },
     likes :{type :Number, required:true },
     dislikes :{type :Number, required:true },
-    tags:[{tyep:String}]
+    tags:[{type:String}]
 })
 
+// for text based Indexing Helps in search 
 
+videoSchema.index(
+  { title: "text", description: "text",category:"text", tags: "text" },
+  { weights: { title: 10, tags: 5,category:2, description: 1 } }
+);
 const Videos = mongoose.model('Videos' , videoSchema);
 
 export {Videos}

@@ -11,11 +11,11 @@ router.post('/uploadVideo',authToken , upload.fields([ { name: 'video', maxCount
 
 
 router.patch('/updateVideoDetails',authToken , updateVideoDetails);
-router.patch('/updateVideoDetails',authToken,upload.single('thumbnail'),convertData , updateThumbnail);
+router.patch('/updateThumbnail',authToken,upload.single('thumbnail'),convertData , updateThumbnail);
 
-router.post('/likeDislikevideo/:videoId',authToken , likeDislikeVideo);
+router.post('/likeDislikevideo',authToken , likeDislikeVideo);
 
-router.delete('/removeVideo/:videoId',authToken , removeVideo);
+router.delete('/removeVideo',authToken , removeVideo);
 
 
 

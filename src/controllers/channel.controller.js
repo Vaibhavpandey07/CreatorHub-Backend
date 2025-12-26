@@ -8,6 +8,7 @@ import fs from "fs/promises"
 import { UserOtherDetails } from '../models/UserOtherDetails.model.js';
 import { Subscriptions } from '../models/Subscriptions.model.js';
 import { Videos } from '../models/Videos.model.js';
+import { Comments } from '../models/Comments.model.js';
 
 
 
@@ -19,14 +20,14 @@ const createChannel = async(req,res)=>{
     }   
 
 
-    const channelUserName = req.body.channelUserName;
+    const channelUserName = String(req.body.channelUserName);
     // const channel = await Channels.findOne({user_id:user._id});
     if(user.userType==2){
         return res.status(400).send(new ApiResponse(400, "channel Already exist"))
         
     }
     
-    const channelWithUserName = await Channels.findOne({channelUserName});
+    const channelWithUserName = await Channels.findOne({channelUserName : channelUserName});
     if(channelWithUserName){
         return res.status(400).send(new ApiResponse(400, "channel user Name already taken please try a different User Name"))
     }
@@ -141,16 +142,23 @@ const updateChannelCoverImage  = async(req,res)=>{
 const subscribeChannel = async(req,res)=>{
     const userId = new mongoose.Types.ObjectId(req.userId)
 
-    const channel = await Channels.findOne(req.params.userName);
+    const channel = await Channels.findOne({channelUserName:String(req.params.userName)});
     if(!channel){
         return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
     }
-    if(new mongoose.Types.ObjectId(channel.user_id) === userId){
+
+    if(userId.equals(new mongoose.Types.ObjectId(channel.user_id))){
         return res.status(401).send(new ApiResponse(401, "You can not subscribe your own channel"));
     }
+
+
     try{    
         const userDetails = await UserOtherDetails.findOne({user_id:userId});
-        if(!(new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
+        if(!(userDetails.subscribedTo.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(channel._id))
+        }) ) ){
+
+
             userDetails.subscribedTo.push(new mongoose.Types.ObjectId(channel._id));
             await userDetails.save({validationBeforeSave:false});
             await Subscriptions.create({subscriber_id:userId, channel_id:new mongoose.Types.ObjectId(channel._id)})
@@ -172,16 +180,20 @@ const subscribeChannel = async(req,res)=>{
 const unsubscribeChannel = async(req,res)=>{
     const userId = new mongoose.Types.ObjectId(req.userId)
 
-    const channel = await Channels.findOne(req.params.userName);
+    const channel = await Channels.findOne({channelUserName:String(req.params.userName)});
     if(!channel){
         return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
     }
-    if(new mongoose.Types.ObjectId(channel.user_id) === userId){
+
+    if(userId.equals(new mongoose.Types.ObjectId(channel._id))){
         return res.status(401).send(new ApiResponse(401, "You can not unsubscribe your own channel"));
     }
     try{    
         const userDetails = await UserOtherDetails.findOne({user_id:userId});
-        if((new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
+        console.log(userDetails.subscribedTo);
+        if(userDetails.subscribedTo.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(channel._id));
+        })){
             
             await Subscriptions.findOneAndDelete({subscriber_id:userId, channel_id:new mongoose.Types.ObjectId(channel._id)});
 
@@ -206,11 +218,11 @@ const getChannelDetails = async(req,res)=>{
     try{
 
         
-        const channel = await Channels.findOne({channelUserName:String(req.params.userName)}).select("-user_id -_id");
+        const channel = await Channels.findOne({channelUserName:String(req.params.userName)});
         if(!channel){
             return res.status(404).send(new ApiResponse(404, "Channel Does Not exist"));
         }
-        const data = {
+        const dataToSend = {
             "channelName" : channel.channelName ,
             "description" : channel.description ,
             "channelUserName" : channel.channelUserName ,
@@ -223,16 +235,21 @@ const getChannelDetails = async(req,res)=>{
         };
         if(req.userId){
             const userDetails = await UserOtherDetails.findOne({user_id:req.userId});
-            if(userDetails && (new mongoose.Types.ObjectId(channel._id) in userDetails.subscribedTo)){
-                data.subscribe = true;
-            }else if(!(new mongoose.Types.ObjectId(channel.user_id) === new mongoose.Types.ObjectId(userDetails.user_id))){
-                data.subscribe =false;
+            
+            if(userDetails && (userDetails.subscribedTo.some(id =>{
+                
+                return id.equals(new mongoose.Types.ObjectId(channel._id))} )) ) 
+            {
+                dataToSend.subscribe = true;
+            }else {
+                dataToSend.subscribe =false;
             }
         }
         
         
         
-        return res.status(200).send(new ApiResponse(200, "Channel Details" , data ));
+        return res.status(200).send(new ApiResponse(200, "Channel Details" , dataToSend ));
+
     }catch(err){
         return res.status(500).send(new ApiResponse(500,err.message));
     }
@@ -243,7 +260,7 @@ const removeChannel= async(req,res)=>{
     if(!user){
         return res.status(400).send(new ApiResponse(400,"User does not exist"))
     }
-    if(user.userType =1){
+    if(user.userType == 1) {
         return res.status(400).send(new ApiResponse(400,"User does not have a channel"))
     }
     
@@ -255,23 +272,46 @@ const removeChannel= async(req,res)=>{
 
 
     try{
-        const channelVideoIds =[];
+        
         const allVideos = await Videos.find({channel_id:channel._id});
-        allVideos.forEach(async(video)=>{
-            fs.unlink(video.videoPath);
-            fs.unlink(video.thumbnail);
+        const channelVideoIds = await Promise.all( allVideos.map(async(video)=>{
+           
+            fs.unlink(video.thumbnail, (err) => {
+                if (err) {
+                    console.error("Failed to delete original file:", err);
+                } else {
+                    console.log("Original file deleted:", video.thumbnail);
+                }
+            });
+            fs.unlink(video.videoPath, (err) => {
+                if (err) {
+                    console.error("Failed to delete original file:", err);
+                } else {
+                    console.log("Original file deleted:", video.videoPath);
+                }
+            });
+            
             await Comments.deleteMany({video_id:video._id});
-            channelVideoIds.push(video._id);
-        })
-        await Videos.deleteMany({_id:{$in :{channelVideoIds}}});
+            return video._id;
+            })
+        )
+        await Videos.deleteMany({_id:{$in :channelVideoIds}});
         await Subscriptions.deleteMany({channel_id:channel._id});
-        fs.unlink(channel.coverImage);
+
+        fs.unlink(channel.coverImage, (err) => {
+            if (err) {
+                console.error("Failed to delete original file:", err);
+            } else {
+                console.log("Original file deleted:",channel.coverImage);
+            }
+        });
+        
         await Channels.deleteOne({_id:channel._id});
         
         user.userType=1;
         await user.save({validationBeforeSave:false});
         
-        return res.status(204).send(new ApiResponse(204,"Channel Deleted Successfully"));
+        return res.status(200).send(new ApiResponse(200,"Channel Deleted Successfully"));
         
 
     }catch(err){
