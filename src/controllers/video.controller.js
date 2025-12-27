@@ -433,11 +433,256 @@ const getAllVideos = async(req,res)=>{
 }
 
 const searchVideos = async(req,res)=>{
-    const searchQuery = `${req.query.searchQuery}`;
-    const result = await (await Videos.find({$text : {$search : searchQuery, score:{$meta :"textScore"}}})).sort({score:{$meta:"testScore"}}).limit(10);
+    const searchQuery = `${req.query.searchQuery?.trim()}`;
+    const page = parseInt(req.query.page)|| 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    if(!searchQuery){
+        return res.status(200).send(new ApiResponse(200, "No search query"));
+    }
     
-    console.log(result);
-    res.send("ok");
+    try{
+        const skip = (page-1)*limit;
+
+
+
+        const searchResults = await Videos.aggregate([
+            {$match:{$text:{$search : searchQuery}, visibility:"public"}},
+            {$addFields : {score :{$meta:"textScore"}}},
+            {$sort :{score:-1}},
+            {$skip :skip},
+            {$limit : 10},
+
+            {$lookup : {
+                from : "channels",
+                localField :"channel_id",
+                foreignField:"_id",
+                as : "channel"
+            }},
+
+            {$unwind :"$channel"},
+
+            {$project : {
+                _id:0,
+                video_id: "$_id",
+                thumbnail:1,
+                title:1,
+                description:1,
+                category:1,
+                language:1,
+                dateUploaded:1,
+                location:1,
+                views:1,
+                likes:1,
+                dislikes:1,
+                channelName :"$channel.channelName",
+                channelDescription : "$channel.description",
+                channelUserName : "$channel.channelUserName",
+                profilePhoto : "$channel.profilePhoto",
+                totalSubscriberCount : "$channel.totalSubscriberCount"
+            }
+
+            }
+        ]
+    )
+
+
+
+
+        res.status(200).send(new ApiResponse(200,(searchResults.length>0)?"Search Results found":"Search Results not Found",{"results" : searchResults,"hasMore":searchResults.length===limit,page,limit}));
+        
+    
+    }catch(err){
+        console.log(err);
+        res.status(500).send(new ApiResponse(500,err.message));
+    }
 }
 
-export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo }
+
+const searchSuggestions = async(req,res)=>{
+    const searchQuery = req.query.searchQuery?.trim();
+    if(!searchQuery){
+        return res.status(200).send(new ApiResponse(200,"no query found"));
+    }
+    try{
+
+        const results = await Videos.aggregate([
+            {
+                // $search :{
+                // index :"autoComplete",
+                // autoComplete :{
+                //     query:searchQuery,
+                //     path:"title",
+                //     fuzzy : {maxEdits:1}
+                //     }
+                // }
+                $match :{title : {$regex : `^${searchQuery}` , $options:"i" },
+                        visibility:"public"
+                        }
+
+            },
+
+            {$limit:5},
+            {$project : {
+                _id:1,
+                title:1
+            }}
+
+
+        ])
+
+        res.status(200).send(new ApiResponse(200,"suggestions",results));
+
+
+    }catch(err){
+        res.status(500).send(new ApiResponse(500,err.message));
+    }
+}
+
+
+
+const randomVideosSuggestions = async(req,res)=>{
+    try{
+        
+
+        const videoResults = await Videos.aggregate([
+            {$match:{visibility:"public"}},
+            {$sample :{size:10}},
+        
+            {$lookup : {
+                from : "channels",
+                localField :"channel_id",
+                foreignField:"_id",
+                as : "channel"
+            }},
+
+            {$unwind :"$channel"},
+       
+            {$project : {
+                _id:0,
+                video_id: "$_id",
+                thumbnail:1,
+                title:1,
+                description:1,
+                category:1,
+                language:1,
+                dateUploaded:1,
+                location:1,
+                views:1,
+                likes:1,
+                dislikes:1,
+                channelName :"$channel.channelName",
+                channelDescription : "$channel.description",
+                channelUserName : "$channel.channelUserName",
+                profilePhoto : "$channel.profilePhoto",
+                totalSubscriberCount : "$channel.totalSubscriberCount"
+            }
+
+            }
+        ]
+    )
+
+        
+        res.status(200).send(new ApiResponse(200,"Results found", videoResults));
+
+        
+    }catch(err){
+        res.status(500).send(new ApiResponse(500,err.message));
+    }
+}
+
+const trendingVideos = async(req,res)=>{
+    try{    
+        const videoList = await Videos.aggregate([
+            {$match:{visibility:"public"}},
+            {$sort :{views:-1,createdAt:-1}},
+            {$limit : 20},
+     
+            {$lookup : {
+                from : "channels",
+                localField :"channel_id",
+                foreignField:"_id",
+                as : "channel"
+            }},
+
+            {$unwind :"$channel"},
+        
+            {$project : {
+                _id:0,
+                video_id:"$_id",
+                thumbnail:1,
+                title:1,
+                description:1,
+                category:1,
+                language:1,
+                dateUploaded:1,
+                location:1,
+                views:1,
+                likes:1,
+                dislikes:1,
+                channelName :"$channel.channelName",
+                channelDescription : "$channel.description",
+                channelUserName : "$channel.channelUserName",
+                profilePhoto : "$channel.profilePhoto",
+                totalSubscriberCount : "$channel.totalSubscriberCount"
+            }
+
+            }
+        ]
+    )
+
+    res.status(200).send(new ApiResponse(200,"Trending Videos", videoList));
+
+    }catch(err){
+        res.status(500).send(new ApiResponse(500, err.message));
+    }
+}
+
+const latestVideos = async(req,res)=>{
+     try{    
+        const videoList = await Videos.aggregate([
+            {$match:{visibility:"public"}},
+            {$sort :{createdAt:-1,views:-1}},
+            {$limit : 20},
+       
+            {$lookup : {
+                from : "channels",
+                localField :"channel_id",
+                foreignField:"_id",
+                as : "channel"
+            }},
+
+            {$unwind :"$channel"},
+       
+            {$project : {
+                _id:0,
+                video_id:"$_id",
+                thumbnail:1,
+                title:1,
+                description:1,
+                category:1,
+                language:1,
+                dateUploaded:1,
+                location:1,
+                views:1,
+                likes:1,
+                dislikes:1,
+                channelName :"$channel.channelName",
+                channelDescription : "$channel.description",
+                channelUserName : "$channel.channelUserName",
+                profilePhoto : "$channel.profilePhoto",
+                totalSubscriberCount : "$channel.totalSubscriberCount"
+            }
+
+            }
+        ]
+    )
+
+    res.status(200).send(new ApiResponse(200,"Latest Videos", videoList));
+
+    }catch(err){
+        res.status(500).send(new ApiResponse(500, err.message));
+    }
+}
+
+export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo, searchVideos , searchSuggestions,randomVideosSuggestions  , trendingVideos, latestVideos }

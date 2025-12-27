@@ -26,8 +26,12 @@ const videoSchema = new mongoose.Schema({
     views :{type :Number, required:true },
     likes :{type :Number, required:true },
     dislikes :{type :Number, required:true },
-    tags:[{type:String}]
-})
+    tags:[{type:String}],
+    random :{
+        type:String,
+        default : Math.random,
+    }
+},{timestamps:true})
 
 // for text based Indexing Helps in search 
 

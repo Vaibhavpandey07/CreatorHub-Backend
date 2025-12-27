@@ -313,6 +313,49 @@ const removeChannel= async(req,res)=>{
 
 }
 
+const mostSubscribedChannels = async(req,res)=>{
+    try{
+        let userDetails = null;
+        if(req.userId){
+            userDetails = await UserOtherDetails.findOne({user_id:new mongoose.Types.ObjectId(req.userId)});    
+        }
+        const channelResult = Channels.aggregate([
+            {$sort : {totalSubscriberCount : 1}},
+            {$limit : 20},
+            {$project : {
+               
+            channelName : 1 ,
+            description :1,
+            channelUserName : 1,
+            profilePhoto : 1,
+            coverImage : 1,
+            contactInfo :1,
+            totalSubscriberCount :1,
+            totalViewCount :1,
+            
+            }}
+        ])
 
+        const dataToSend = (await channelResult).map((channel)=>{
+            if(userDetails){
+                console.log(userDetails.subscribedTo)
+                if(userDetails.subscribedTo.some((id)=>{
+                    return id.equals(channel._id);
+                })){
+                    channel.subscribe = true;
+                }else{
+                    channel.subscribe = false;
+                }
+            }
+            delete channel._id;
+            return channel;
+        })
 
-export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel , removeChannel}
+        res.status(200).send(new ApiResponse(200, "Most Subscribe Channel",dataToSend));
+
+    }catch(err){
+        res.status(500).send(new ApiResponse(500,err.message));
+    }
+}
+
+export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel , removeChannel , mostSubscribedChannels}
