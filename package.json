@@ -1,5 +1,5 @@
 {
-  "name": "youtube-clone-backend",
+  "name": "creatorhub-backend",
   "version": "1.0.0",
   "description": "This is a backend Of youtubeClone",
   "license": "ISC",
@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.1",
     "multer": "^2.0.2",
+    "nodemailer": "^7.0.12",
     "nodemon": "^3.1.11",
     "uuidv4": "^6.2.13"
   }

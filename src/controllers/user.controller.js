@@ -12,6 +12,7 @@ import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
 import { Subscriptions } from "../models/Subscriptions.model.js";
 import { Videos } from "../models/Videos.model.js";
 import { Comments } from "../models/Comments.model.js";
+import { generateOtp, sendOtpEmail } from "../services/sendOtpEmail.services.js";
 
 
 
@@ -25,6 +26,7 @@ const registration = async(req,res) =>{
             if(req.fileName){
                 filePath = `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`
             }        
+            const otp = generateOtp();
             
             const dataToSave = {
                 "email": req.body.email,
@@ -34,14 +36,21 @@ const registration = async(req,res) =>{
                 "password" : req.body.password,
                 "profilePhoto": filePath,
                 "userType" : 1,
-                "refreshToken" : ""
+                "refreshToken" : "",
+                "emailOTP":otp,
+                "emailOTPExpires": Date.now()+ 10*60*1000
             }
             
             
             try{
                 const user = await Users.create(dataToSave);
                 await UserOtherDetails.create({"user_id" : new mongoose.Types.ObjectId(user._id) , "watchHisttory":[],"searchHistory":[] , "likedVideos":[],"disLikedVideos":[],"notification":[] , "subscribedTo":[]})
-                res.status(201).send(new ApiResponse(201,"User created successfully"))
+                await  sendOtpEmail(dataToSave.email,otp);
+
+
+                res.status(201).send(new ApiResponse(201,"A verification Otp has been send to the registered Email",{email:dataToSave.email}));
+
+
             }catch(err){
                 console.log(err);
                 res.status(500).send(new ApiResponse(500,"there was a problem while creating a new user"))
@@ -69,9 +78,15 @@ const login = async(req,res)=>{
     if(!user){
         return  res.status(400).send(new ApiResponse(400,`No user exist with this Email`))
     }
+
+
     const checkPassword = await user.isPasswordCorrect(req.body.password);
     if(!checkPassword){
         return  res.status(400).send(new ApiResponse(400,`Wrong Password`))
+    }
+
+    if(!user.isEmailVerified){
+        return  res.status(400).send(new ApiResponse(400,`Please verify your Email`));
     }
 
     try{
@@ -304,5 +319,62 @@ const getUserDetails = async(req,res)=>{
     }
 }
 
+const verifyEmail = async(req,res)=>{
+    const {email, otp } = req.body;
+    const user = await Users.findOne({email:email});
+    if(!user){
+        return res.status(400).send(new ApiResponse(400,"No user Found"));
+    }
+    if(user.isEmailVerified){
+        return res.status(200).send(new ApiResponse(200, "Email already Verified"));
+    }
+    try{
+        if(user.emailOTP != String(otp)){
+            return res.status(401).send(new ApiResponse(401,"Invalid OTP"));
+        }
+        else if(user.emailOTPExpires < Date.now()){
+            return res.status(401).send(new ApiResponse(401,"OTP expired generate a new OTP"));
+        }
+        else{
+            user.emailOTP =null;
+            user.emailOTPExpires=null,
+            user.isEmailVerified = true,
+            await user.save({validationBeforeSave:false});
+            return res.status(200).send(new ApiResponse(200,"OTP Verified successfully"));
+        }
 
-export { registration, login , logOut , updateUserDetails , getNewAccesstoken , updateProfilePhoto , removeUser , resetPassword , getUserDetails};
+    }catch(err){
+       return res.status(500).send(new ApiResponse(500,err.message))
+    }
+}
+
+const generateNewOtp = async(req,res)=>{
+    const {email} = req.body;
+    const user = await Users.findOne({email:email});
+    if(!user){
+       return res.status(400).send(new ApiResponse(400,"No user Found"));
+    }
+
+    if(user.isEmailVerified){
+        return res.status(200).send(new ApiResponse(200, "Email already Verified"));
+    }
+
+    try{
+
+        const otp = generateOtp();
+        user.emailOTP = otp;
+        user.emailOTPExpires = Date.now() + 10 * 60 * 1000;
+        await user.save({validationBeforeSave:false});
+
+        await sendOtpEmail(email, otp);
+
+        return res.status(200).send(new ApiResponse(200,"new OTP sent"));
+
+    }catch(err){
+        return res.status(500).send(new ApiResponse(500,err.message))
+    }
+}
+
+
+
+export { registration, login , logOut , updateUserDetails , getNewAccesstoken , updateProfilePhoto , removeUser , resetPassword , getUserDetails ,verifyEmail, generateNewOtp };

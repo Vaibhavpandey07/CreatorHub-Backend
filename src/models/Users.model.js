@@ -14,7 +14,10 @@ const userSchema = new Schema({
     password :{type:String , required :true },
     profilePhoto : {type:String },
     userType :{type:Number , required :true},
-    refreshToken :{type:String}
+    refreshToken :{type:String},
+    isEmailVerified :{type:Boolean, default:false},
+    emailOTP :{type:String},
+    emailOTPExpires :{type:Date}
     
 }, {timestamps:true})
 

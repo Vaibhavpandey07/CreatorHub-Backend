@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { registration, login, logOut, updateUserDetails ,getNewAccesstoken ,updateProfilePhoto , removeUser, resetPassword , getUserDetails} from "../controllers/user.controller.js";
+import { registration, login, logOut, updateUserDetails ,getNewAccesstoken ,updateProfilePhoto , removeUser, resetPassword , getUserDetails, verifyEmail, generateNewOtp} from "../controllers/user.controller.js";
 import {validation} from "../middleware/userValidation.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 import { convertData } from "../middleware/convertData.middleware.js";
@@ -14,6 +14,10 @@ router.post('/login',login);
 router.get('/userDetails',authToken , getUserDetails );
 router.get('/getAccessToken',getNewAccesstoken);
 router.get('/logout',authToken,logOut);
+
+router.post('/verifyEmail',verifyEmail);
+router.post('/generateNewOtp',generateNewOtp);
+
 
 router.patch('/updateDetails',authToken,updateUserDetails);
 router.patch('/resetPassword',authToken,resetPassword);
