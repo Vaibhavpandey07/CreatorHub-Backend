@@ -7,7 +7,7 @@ import ApiError from "../utlis/ApiErrors.util.js"
 const authToken = async( req, res, next)=>{
     const token = req.cookies.accessToken || req.header("Authorization")?.replace("Bearer ", "") 
     if(!token){
-       throw new ApiError(401,"No token found");
+       throw new ApiError(400,"No token found");
     }
     else{
         try{
@@ -27,7 +27,7 @@ const authToken = async( req, res, next)=>{
             if (err instanceof jwt.TokenExpiredError) {
                 throw new ApiError(401,"Token Expired");
             }
-            throw new ApiError(401,err.message);
+            throw new ApiError(404,err.message);
         }
     }
 }

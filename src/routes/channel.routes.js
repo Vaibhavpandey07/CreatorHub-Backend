@@ -1,5 +1,5 @@
 import { Router} from "express";
-import { createChannel, updateChannelDetails , updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel, removeChannel, mostSubscribedChannels } from "../controllers/channel.controller.js";
+import { createChannel, updateChannelDetails , updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel, removeChannel, mostSubscribedChannels, getMyChannelDetails } from "../controllers/channel.controller.js";
 import { authToken } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 
@@ -12,6 +12,8 @@ const router = Router();
 
 router.post('/createChannel',authToken,upload.single('coverImage'),convertData,createChannel)
 router.patch('/updateChannel',authToken,updateChannelDetails)
+
+router.get("/UserChannelDetails",authToken , getMyChannelDetails);
 
 router.patch('/updateChannelCoverImage',authToken,upload.single('coverImage'),updateChannelCoverImage)
 

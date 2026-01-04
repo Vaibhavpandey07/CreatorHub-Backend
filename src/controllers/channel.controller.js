@@ -212,6 +212,41 @@ const unsubscribeChannel = async(req,res)=>{
     }
 }
 
+const getMyChannelDetails = async(req,res)=>{
+    const userId = new mongoose.Types.ObjectId(req.userId)
+
+    const channel = await Channels.findOne({user_id:userId});
+
+    if(!channel){
+        throw new ApiError(404, "Channel does not exist");
+    }
+
+    try{
+
+        const dataToSend = {
+            "channelName" : channel.channelName ,
+            "description" : channel.description ,
+            "channelUserName" : channel.channelUserName ,
+            "profilePhoto" : channel.profilePhoto ,
+            "coverImage" : channel.coverImage ,
+            "contactInfo" : channel.contactInfo ,
+            "homeTabSetting" : channel.homeTabSetting ,
+            "totalSubscriberCount" : channel.totalSubscriberCount ,
+            "totalViewCount" : channel.totalViewCount,
+            "owner":true 
+        };
+
+        
+        return res.status(200).send(new ApiResponse(200, "Channel Details" , dataToSend ));
+
+    }catch(err){
+        throw new ApiError(500,err.message);
+    }
+}
+
+
+
+
 // optionalAuth
 const getChannelDetails = async(req,res)=>{
     // console.log(req.params.userName);
@@ -359,4 +394,4 @@ const mostSubscribedChannels = async(req,res)=>{
     }
 }
 
-export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel , removeChannel , mostSubscribedChannels}
+export {createChannel, updateChannelDetails, updateChannelCoverImage , getChannelDetails, subscribeChannel,unsubscribeChannel , removeChannel , mostSubscribedChannels , getMyChannelDetails}

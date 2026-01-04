@@ -14,6 +14,7 @@ import { Videos } from "../models/Videos.model.js";
 import { Comments } from "../models/Comments.model.js";
 import { generateOtp, sendOtpEmail } from "../services/sendOtpEmail.services.js";
 import ApiError from "../utlis/ApiErrors.util.js";
+import { createAvatar } from "../services/createAvatar.service.js";
 
 
 
@@ -23,9 +24,12 @@ const registration = async(req,res) =>{
     if(err.isEmpty()){
         const found = await Users.findOne({email:req.body.email});
         if(!found){
-            let filePath = ""
+            let inputImagePath = "";
+            let outputImagePath = "";
             if(req.fileName){
-                filePath = `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`
+                inputImagePath = `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`
+                outputImagePath = `${env.UPLOAD_AVATAR_FOLDER}/${req.fileName[0]?.name}`
+
             }        
             const otp = generateOtp();
             
@@ -35,7 +39,7 @@ const registration = async(req,res) =>{
                 "lastName"  : req.body.lastName,
                 "fullName" : req.body.firstName+' '+req.body.lastName,
                 "password" : req.body.password,
-                "profilePhoto": filePath,
+                "profilePhoto": outputImagePath,
                 "userType" : 1,
                 "refreshToken" : "",
                 "emailOTP":otp,
@@ -44,6 +48,20 @@ const registration = async(req,res) =>{
             
             
             try{
+                createAvatar(inputImagePath, outputImagePath).then(()=>{
+                    
+                    fs.unlink(inputImagePath, (err) => {
+                        if (err) {
+                            console.error("Failed to delete original file:", err);
+                        } 
+                        else {
+                            console.log("Original file deleted:", inputImagePath);
+                        }
+                        });
+                    } 
+                );
+
+
                 const user = await Users.create(dataToSave);
                 await UserOtherDetails.create({"user_id" : new mongoose.Types.ObjectId(user._id) , "watchHisttory":[],"searchHistory":[] , "likedVideos":[],"disLikedVideos":[],"notification":[] , "subscribedTo":[]})
                 await  sendOtpEmail(dataToSave.email,otp);
@@ -72,22 +90,22 @@ const registration = async(req,res) =>{
 const login = async(req,res)=>{
 
     if(!req.body.email || !req.body.password){
-        throw new ApiError(400,`Please Enter email and password`);
+        throw new ApiError(400,`Please Enter email and password`,[],{"email": {"check" :req.body.email, "message":"Enter your Email"} , "password":{"check": req.body.password , "message":"Enter your Password"}});
     }
 
     const user = await Users.findOne({email:req.body.email});
     if(!user){
-        throw new ApiError(400,`No user exist with this Email`);
+        throw new ApiError(400,`No user exist with this Email`,[],{"email":{"check":false , "message" : "No user exist with this Email"}});
     }
 
 
     const checkPassword = await user.isPasswordCorrect(req.body.password);
     if(!checkPassword){
-        throw new ApiError(400,`Wrong Password`)
+        throw new ApiError(400,`Wrong Password`,[],{"password" : {"check":false , "message" : "Wrong Password"}})
     }
 
     if(!user.isEmailVerified){
-         throw new ApiError(400,`Please verify your Email`);
+         throw new ApiError(400,`Please verify your Email`,[],{"email":{"check":false , "message" : "Verify your Email"}});
     }
 
     try{
@@ -98,7 +116,7 @@ const login = async(req,res)=>{
     }
     catch(err){
         console.log(err)
-         throw new ApiError(500,`Sorry there was a problem`);
+         throw new ApiError(500,`Sorry there was a problem`,[]);
     }
 
 }
@@ -311,7 +329,7 @@ const getUserDetails = async(req,res)=>{
             "email" :user.email,
             "fullName" :user.fullName,
             "profilePhoto":user.profilePhoto,
-            "Creator" : user.userType==2?true:false,
+            "creator" : user.userType==2?true:false,
         }
         return res.status(200).send(new ApiResponse(200,"success",data))
     }
@@ -356,12 +374,12 @@ const generateNewOtp = async(req,res)=>{
        throw new ApiError(400,"No user Found");
     }
 
-    if(user.isEmailVerified){
+    if(user.isEmailVerified && !req.body.forgetPassword){
         throw new ApiError(200, "Email already Verified");
     }
 
     try{
-
+        
         const otp = generateOtp();
         user.emailOTP = otp;
         user.emailOTPExpires = Date.now() + 10 * 60 * 1000;
@@ -378,4 +396,34 @@ const generateNewOtp = async(req,res)=>{
 
 
 
-export { registration, login , logOut , updateUserDetails , getNewAccesstoken , updateProfilePhoto , removeUser , resetPassword , getUserDetails ,verifyEmail, generateNewOtp };
+const resetPasswordWithOTP = async(req,res)=>{
+    const {email,otp,newPassword} = req.body;
+    const user = await Users.findOne({email:email});
+    if(!user){
+       throw new ApiError(400,"User does not exist")
+    }
+    try{
+        if(Number(user.emailOTP) !== Number(otp)){
+            throw new ApiError(400,"Invalid OTP")
+        }
+        
+        try{
+            user.password = newPassword;
+            await user.save({validateBeforeSave:false});
+            return res.status(200).send(new ApiResponse(200,"Password Changed successfully"))
+        }
+        catch(err){
+            throw new ApiError(500,err.message);
+        }
+    
+    
+    }
+    catch(err){
+        throw new ApiError(500,err.message);
+    }
+}
+
+
+
+
+export { registration, login , logOut , updateUserDetails , getNewAccesstoken , updateProfilePhoto , removeUser , resetPassword , getUserDetails ,verifyEmail, generateNewOtp , resetPasswordWithOTP };
