@@ -9,6 +9,7 @@ import { UserOtherDetails } from '../models/UserOtherDetails.model.js';
 import { Subscriptions } from '../models/Subscriptions.model.js';
 import { Videos } from '../models/Videos.model.js';
 import { Comments } from '../models/Comments.model.js';
+import ApiError from '../utlis/ApiErrors.util.js';
 
 
 
@@ -16,20 +17,20 @@ import { Comments } from '../models/Comments.model.js';
 const createChannel = async(req,res)=>{
     const user = await Users.findById(req.userId);
     if(!user){
-        return res.status(404).send(new ApiResponse(404, "User Does Not exist"))
+        throw new ApiError(404, "User Does Not exist");
     }   
 
 
     const channelUserName = String(req.body.channelUserName);
     // const channel = await Channels.findOne({user_id:user._id});
     if(user.userType==2){
-        return res.status(400).send(new ApiResponse(400, "channel Already exist"))
+        throw new ApiError(400, "channel Already exist");
         
     }
     
     const channelWithUserName = await Channels.findOne({channelUserName : channelUserName});
     if(channelWithUserName){
-        return res.status(400).send(new ApiResponse(400, "channel user Name already taken please try a different User Name"))
+        throw new ApiError(400, "channel user Name already taken please try a different User Name");
     }
     
     
@@ -63,7 +64,7 @@ const createChannel = async(req,res)=>{
 
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500, err.message));
+        throw new ApiError(500, err.message);
     }
 
 
@@ -74,14 +75,14 @@ const updateChannelDetails = async(req,res)=>{
     const userId = new mongoose.Types.ObjectId(req.userId)
     const channel = await Channels.findOne({'user_id':userId});
     if(!channel){
-        return res.status(404).send(new ApiResponse(404, "User does not have a channel"));
+        throw new ApiError(404, "User does not have a channel");
     }
 
     const channelUserName = req.body?.channelUserName;
     if(channelUserName){
        const channelWithUserName = await Channels.findOne({channelUserName});
        if(channelWithUserName){
-           return res.status(400).send(new ApiResponse(400, "channel user Name already taken please try a different User Name"))
+           throw new ApiError(400, "channel user Name already taken please try a different User Name");
         }
     }
 
@@ -103,7 +104,7 @@ const updateChannelDetails = async(req,res)=>{
 
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500, err.message));
+        throw new ApiError(500, err.message);
     }
 
 }
@@ -115,10 +116,10 @@ const updateChannelCoverImage  = async(req,res)=>{
 
     const channel = await Channels.findOne({'user_id':userId});
     if(!channel){
-        return res.status(404).send(new ApiResponse(404, "User does not have a channel"));
+        throw new ApiError(404, "User does not have a channel");
     }
     if(!req.fileName){
-        return res.status(400).send(new ApiResponse(400,"Please upload a new cover Image"))
+        throw new ApiError(400,"Please upload a new cover Image");
     }
 
     try{
@@ -135,7 +136,7 @@ const updateChannelCoverImage  = async(req,res)=>{
 
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500, err.message));
+        throw new ApiError(500, err.message);
     }
 }
 
@@ -144,11 +145,11 @@ const subscribeChannel = async(req,res)=>{
 
     const channel = await Channels.findOne({channelUserName:String(req.params.userName)});
     if(!channel){
-        return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
+        throw new ApiError(404, "Channel does not exist");
     }
 
     if(userId.equals(new mongoose.Types.ObjectId(channel.user_id))){
-        return res.status(401).send(new ApiResponse(401, "You can not subscribe your own channel"));
+        throw new ApiError(401, "You can not subscribe your own channel");
     }
 
 
@@ -169,11 +170,11 @@ const subscribeChannel = async(req,res)=>{
             return res.status(200).send(new ApiResponse(200,"Channel Subscribed",{"subscribe":true}));
         }
         
-        return res.status(200).send(new ApiResponse(200,"Channel already Subscribed",{"subscribe":true}));
+        throw new ApiError(200,"Channel already Subscribed",{"subscribe":true});
 
         
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -182,11 +183,11 @@ const unsubscribeChannel = async(req,res)=>{
 
     const channel = await Channels.findOne({channelUserName:String(req.params.userName)});
     if(!channel){
-        return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
+        throw new ApiError(404, "Channel does not exist");
     }
 
     if(userId.equals(new mongoose.Types.ObjectId(channel._id))){
-        return res.status(401).send(new ApiResponse(401, "You can not unsubscribe your own channel"));
+        throw new ApiError(401, "You can not unsubscribe your own channel");
     }
     try{    
         const userDetails = await UserOtherDetails.findOne({user_id:userId});
@@ -204,10 +205,10 @@ const unsubscribeChannel = async(req,res)=>{
             return res.status(200).send(new ApiResponse(200,"Channel Unsubscribed",{"subscribe":false}));
 
         }
-        return res.status(200).send(new ApiResponse(200,"Channel already Unsubscribed",{"subscribe":false}));
+         throw new ApiError(200,"Channel already Unsubscribed",{"subscribe":false});
         
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -220,7 +221,7 @@ const getChannelDetails = async(req,res)=>{
         
         const channel = await Channels.findOne({channelUserName:String(req.params.userName)});
         if(!channel){
-            return res.status(404).send(new ApiResponse(404, "Channel Does Not exist"));
+            throw new ApiError(404, "Channel Does Not exist");
         }
         const dataToSend = {
             "channelName" : channel.channelName ,
@@ -251,23 +252,23 @@ const getChannelDetails = async(req,res)=>{
         return res.status(200).send(new ApiResponse(200, "Channel Details" , dataToSend ));
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 }
 
 const removeChannel= async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+        throw new ApiError(400,"User does not exist");
     }
     if(user.userType == 1) {
-        return res.status(400).send(new ApiResponse(400,"User does not have a channel"))
+        throw new ApiError(400,"User does not have a channel");
     }
     
     const channel = await Channels.findOne({user_id:user._id});
     
     if(!channel){
-        return res.status(404).send(new ApiResponse(404, "Channel does not exist"));
+        throw new ApiError(404, "Channel does not exist");
     }
 
 
@@ -306,7 +307,7 @@ const removeChannel= async(req,res)=>{
         
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 
 
@@ -354,7 +355,7 @@ const mostSubscribedChannels = async(req,res)=>{
         res.status(200).send(new ApiResponse(200, "Most Subscribe Channel",dataToSend));
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+       throw new ApiError(500,err.message);
     }
 }
 

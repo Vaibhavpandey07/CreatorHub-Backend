@@ -8,17 +8,9 @@ dotenv.config({
 
 const env = process.env;
 
- 
-
 const generateOtp = ()=>{
     return Math.floor(1000+Math.random()*9000);
 }
-
-// const env = {
-//     EMAIL:"vaibhav36vp@gmail.com",
-//     PASSWORD : "rykfwghtddsviwho"
-// }
-
 
 const sendOtpEmail = async(email,otp)=>{
 

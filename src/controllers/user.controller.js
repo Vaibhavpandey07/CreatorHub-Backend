@@ -13,6 +13,7 @@ import { Subscriptions } from "../models/Subscriptions.model.js";
 import { Videos } from "../models/Videos.model.js";
 import { Comments } from "../models/Comments.model.js";
 import { generateOtp, sendOtpEmail } from "../services/sendOtpEmail.services.js";
+import ApiError from "../utlis/ApiErrors.util.js";
 
 
 
@@ -53,17 +54,17 @@ const registration = async(req,res) =>{
 
             }catch(err){
                 console.log(err);
-                res.status(500).send(new ApiResponse(500,"there was a problem while creating a new user"))
+                throw new ApiError(500,"there was a problem while creating a new user");
             }   
 
 
         }else{ 
-            res.status(400).send(new ApiResponse(400,"User already exist"))
+            throw new ApiError(400,"User already exist")
         }
 
     }
     else{
-        res.status(400).send(new ApiResponse(400,`Validation Error : invalid ${err.errors[0].path}`))
+       throw new ApiError(400,`Validation Error : invalid ${err.errors[0].path}`);
     }
     
 }
@@ -71,22 +72,22 @@ const registration = async(req,res) =>{
 const login = async(req,res)=>{
 
     if(!req.body.email || !req.body.password){
-        return res.status(400).send(new ApiResponse(400,`Please Enter email and password`))
+        throw new ApiError(400,`Please Enter email and password`);
     }
 
     const user = await Users.findOne({email:req.body.email});
     if(!user){
-        return  res.status(400).send(new ApiResponse(400,`No user exist with this Email`))
+        throw new ApiError(400,`No user exist with this Email`);
     }
 
 
     const checkPassword = await user.isPasswordCorrect(req.body.password);
     if(!checkPassword){
-        return  res.status(400).send(new ApiResponse(400,`Wrong Password`))
+        throw new ApiError(400,`Wrong Password`)
     }
 
     if(!user.isEmailVerified){
-        return  res.status(400).send(new ApiResponse(400,`Please verify your Email`));
+         throw new ApiError(400,`Please verify your Email`);
     }
 
     try{
@@ -97,7 +98,7 @@ const login = async(req,res)=>{
     }
     catch(err){
         console.log(err)
-        return res.status(500).send(new ApiResponse(500,`Sorry there was a problem`))
+         throw new ApiError(500,`Sorry there was a problem`);
     }
 
 }
@@ -106,7 +107,7 @@ const login = async(req,res)=>{
 const logOut = async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+        throw new ApiError(400,"User does not exist")
     }
     user.refreshToken = "";
     await user.save({validateBeforeSave :false});
@@ -122,10 +123,10 @@ const logOut = async(req,res)=>{
 const updateUserDetails = async (req,res) =>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+       throw new ApiError(400,"User does not exist")
     }
     if(!req.body.email && !req.body.firstName && !req.body.lastName){
-        return res.status(400).send(new ApiResponse(400,"Please Enter fields to update"))
+       throw new ApiError(400,"Please Enter fields to update")
     }
     
     try{
@@ -139,7 +140,7 @@ const updateUserDetails = async (req,res) =>{
     
         return res.status(200).send(new ApiResponse(200,"User Details Updated Successfully"))
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message))
+        throw new ApiError(500,err.message)
     }
 
 }
@@ -149,13 +150,13 @@ const updateUserDetails = async (req,res) =>{
 const getNewAccesstoken = async(req,res) =>{
     const refreshToken = req.cookies.refreshToken || req.header("refreshToken")?.replace("Bearer ", "") 
     if(!refreshToken){
-        res.status(401).send(new ApiResponse(401,"No token found"))
+        throw new ApiError(401,"No token found")
     }
     else{
         try{
             const payload = jwt.verify(refreshToken , env.REFRESH_TOKEN_SIGN );
             if(!payload?._id){
-                res.status(401).send(new ApiResponse(401,"Token Invalid"))
+                throw new ApiError(401,"Token Invalid")
 
             }
             const {newAccessToken , newRefreshToken} = await generateToken(payload._id); 
@@ -166,16 +167,16 @@ const getNewAccesstoken = async(req,res) =>{
                     return  res.status(200).cookie("accessToken",newAccessToken,options).cookie("refreshToken",newRefreshToken,options).json(new ApiResponse(200,"New Token has been generated"));
                 }
             else{
-                return  res.status(500).send(new ApiResponse(500,"something went wrong"));
+                throw new ApiError(500,"something went wrong");
             }
 
 
             
         }catch(err){
             if (err instanceof jwt.TokenExpiredError) {
-                return res.status(401).send(new ApiResponse(401,"Refresh Token Expired LogIn Again"))
+                throw new ApiError(401,"Refresh Token Expired LogIn Again")
             }
-            return res.status(401).send(new ApiResponse(401,err.message))
+            throw new ApiError(401,err.message)
         }
     }
 
@@ -185,10 +186,10 @@ const getNewAccesstoken = async(req,res) =>{
 const updateProfilePhoto =async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+        throw new ApiError(400,"User does not exist");
     }
     if(!req.fileName){
-        return res.status(400).send(new ApiResponse(400,"Please upload Image"))
+        throw new ApiError(400,"Please upload Image");
     }
     try{
         await withTransaction(async(session)=>{
@@ -208,7 +209,7 @@ const updateProfilePhoto =async(req,res)=>{
         })
     }
     catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message))
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -216,7 +217,7 @@ const updateProfilePhoto =async(req,res)=>{
 const resetPassword = async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+       throw new ApiError(400,"User does not exist")
     }
     try{
         const password   = req.body.password
@@ -225,7 +226,7 @@ const resetPassword = async(req,res)=>{
          const checkPassword = await user.isPasswordCorrect(req.body.password);
         
          if(!checkPassword){
-            return  res.status(400).send(new ApiResponse(401,`Password Does not match`))
+            throw new ApiError(401,`Password Does not match`);
         }
         
         try{
@@ -234,13 +235,13 @@ const resetPassword = async(req,res)=>{
             return res.status(200).send(new ApiResponse(200,"Password Changed successfully"))
         }
         catch(err){
-            return res.status(200).send(new ApiResponse(200,err.message))
+            throw new ApiError(200,err.message);
         }
     
     
     }
     catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message))
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -248,7 +249,7 @@ const resetPassword = async(req,res)=>{
 const removeUser = async(req,res)=>{
     const user = await Users.findById({_id:req.userId})
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+        throw new ApiError(400,"User does not exist");
     }
      try{
                 
@@ -293,7 +294,7 @@ const removeUser = async(req,res)=>{
     
     }
     catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message))
+       throw new ApiError(500,err.message);
     }
 }
 
@@ -301,7 +302,7 @@ const removeUser = async(req,res)=>{
 const getUserDetails = async(req,res)=>{
     const user = await Users.findById({_id:req.userId}).select("-_id -password -refreshToken")
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"User does not exist"))
+        throw new ApiError(400,"User does not exist");
     }
     try{
         const data={
@@ -315,7 +316,7 @@ const getUserDetails = async(req,res)=>{
         return res.status(200).send(new ApiResponse(200,"success",data))
     }
     catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message))
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -323,17 +324,17 @@ const verifyEmail = async(req,res)=>{
     const {email, otp } = req.body;
     const user = await Users.findOne({email:email});
     if(!user){
-        return res.status(400).send(new ApiResponse(400,"No user Found"));
+        throw new ApiError(400,"No user Found");
     }
     if(user.isEmailVerified){
-        return res.status(200).send(new ApiResponse(200, "Email already Verified"));
+        throw new ApiError(200, "Email already Verified");
     }
     try{
         if(user.emailOTP != String(otp)){
-            return res.status(401).send(new ApiResponse(401,"Invalid OTP"));
+            throw new ApiError(401,"Invalid OTP");
         }
         else if(user.emailOTPExpires < Date.now()){
-            return res.status(401).send(new ApiResponse(401,"OTP expired generate a new OTP"));
+            throw new ApiError(401,"OTP expired generate a new OTP");
         }
         else{
             user.emailOTP =null;
@@ -344,7 +345,7 @@ const verifyEmail = async(req,res)=>{
         }
 
     }catch(err){
-       return res.status(500).send(new ApiResponse(500,err.message))
+       throw new ApiError(500,err.message);
     }
 }
 
@@ -352,11 +353,11 @@ const generateNewOtp = async(req,res)=>{
     const {email} = req.body;
     const user = await Users.findOne({email:email});
     if(!user){
-       return res.status(400).send(new ApiResponse(400,"No user Found"));
+       throw new ApiError(400,"No user Found");
     }
 
     if(user.isEmailVerified){
-        return res.status(200).send(new ApiResponse(200, "Email already Verified"));
+        throw new ApiError(200, "Email already Verified");
     }
 
     try{
@@ -371,7 +372,7 @@ const generateNewOtp = async(req,res)=>{
         return res.status(200).send(new ApiResponse(200,"new OTP sent"));
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message))
+        throw new ApiError(500,err.message);
     }
 }
 

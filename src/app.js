@@ -8,6 +8,7 @@ import commentRouter from './routes/comment.routes.js';
 import userOtherDetailsRouter from './routes/userOtherDetails.routes.js';
 
 import cookieParser from 'cookie-parser'
+import errorMiddleware from './middleware/error.middleware.js';
 
 dotenv.config({path:"./.env"})
 const app = express();
@@ -21,6 +22,7 @@ app.use(cors({
 app.use(express.urlencoded());
 app.use(express.json());
 app.use(cookieParser());
+
 
 
 app.use('/public', express.static('public'));
@@ -40,5 +42,6 @@ app.get('/', (req,res)=>{
 });
 
 
+app.use(errorMiddleware);
 
 export  {app};

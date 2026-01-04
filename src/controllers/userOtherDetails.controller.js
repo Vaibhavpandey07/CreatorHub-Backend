@@ -4,6 +4,7 @@ import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
 import Users from "../models/Users.model.js";
 import { Videos } from "../models/Videos.model.js";
 import { ApiResponse } from "../utlis/ApiResponse.util.js";
+import ApiError from "../utlis/ApiErrors.util.js";
 
 
 const getWatchHistory = async(req , res )=>{
@@ -50,7 +51,7 @@ const getWatchHistory = async(req , res )=>{
 
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 
 }
@@ -96,7 +97,7 @@ const getLikedVideos = async(req , res )=>{
 
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 
 }
@@ -129,7 +130,7 @@ const getSubscribedChannels = async(req,res)=>{
 
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 
 }
@@ -142,7 +143,7 @@ const getNotification = async(req,res)=>{
         res.status(200).send(new ApiResponse(200,"notification",data));
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
 
     }
 }
@@ -157,7 +158,7 @@ const clearWatchHistory = async(req,res)=>{
 
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
 
     }
 }
@@ -169,7 +170,7 @@ const removeFromWatchHistory = async(req,res)=>{
         await UserOtherDetails.findOneAndUpdate({user_id:userId},{$pull:{watchHisttory:videoId}});
         res.status(200).send(new ApiResponse(200,"Video Removed from watch History"));
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
 
     }
 }

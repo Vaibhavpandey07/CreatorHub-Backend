@@ -1,4 +1,4 @@
-import { ApiResponse } from "../utlis/ApiResponse.util.js"
+
 import  jwt from "jsonwebtoken"
 import { env } from "../utlis/getEnvVariable.util.js"
 import Users from "../models/Users.model.js"
@@ -8,7 +8,6 @@ const optionalAuth = async( req, res, next)=>{
     if(!token){
         req.userId = null;
         next();
-        // return res.status(401).send(new ApiResponse(401,"No token found"))
     }
     else{
         try{

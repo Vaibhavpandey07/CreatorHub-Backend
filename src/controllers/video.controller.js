@@ -10,6 +10,7 @@ import Users from "../models/Users.model.js"
 import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
 import fs from "fs";
 import { Comments } from "../models/Comments.model.js";
+import ApiError from "../utlis/ApiErrors.util.js";
 
 
 
@@ -20,10 +21,10 @@ const uploadVideo = async(req,res)=>{
     const userId = new mongoose.Types.ObjectId(req.userId);
     const channel = await Channels.findOne({user_id:userId})
     if(!channel){
-        return res.status(400).send( new ApiResponse(400, "Please create a channel to Upload Videos"));
+        throw new ApiError(400, "Please create a channel to Upload Videos");
     }
     if(!req.fileName){
-        return res.status(400).send( new ApiResponse(400, "Please upload video"));
+        throw new ApiError(400, "Please upload video");
     }
 
 
@@ -50,7 +51,7 @@ const uploadVideo = async(req,res)=>{
     const dataToSave = {
         "user_id" : new mongoose.Types.ObjectId(channel.user_id) ,
         "channel_id" : new mongoose.Types.ObjectId(channel._id) ,
-        "videoUrl" : `${videoOutputPath}/stream_0.m3u8`,
+        "videoUrl" : `${videoOutputPath}/master.m3u8`,
         "videoPath" : `${videoOutputPath}`,
         "thumbnail" : `${env.UPLOAD_THUMBNAIL_FOLDER}/${thumbnailDetails.name}`,
         "title" : req.body?.title,
@@ -71,17 +72,26 @@ const uploadVideo = async(req,res)=>{
         try{
             const videoConvertToHLS = new videoToHLS;
     
-            videoConvertToHLS.convertToHLS(videoInputPath,videoOutputPath).then(() => console.log("Done")).catch(console.error);
+            videoConvertToHLS.convertToHLS(videoInputPath,videoOutputPath).then(() =>{
+            fs.unlink(videoInputPath, (err) => {
+                if (err) {
+                console.error("Failed to delete original file:", err);
+                } else {
+                console.log("Original file deleted:", videoInputPath);
+                }
+            });
+                
+            console.log("Done")}).catch(console.error);
 
             return res.status(201).send(new ApiResponse(201,`Video uploaded successfully and now it is being processed`,{"videoURL":dataToSave.videoUrl}))
         }catch(err){
-            return res.status(500).send(new ApiResponse(500,err.message));
+            throw new ApiError(500,err.message);
 
         }
 
     }
     catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 
 }
@@ -92,18 +102,18 @@ const updateVideoDetails = async(req,res)=>{
     const video = await Videos.findById(new mongoose.Types.ObjectId(videoId));
 
     if(!video){
-        return res.status(400).send( new ApiResponse(400, "Video does not exist"));
+        throw new ApiError(400, "Video does not exist");
     }
     const userId = new mongoose.Types.ObjectId(req.userId);
     const channel = await Channels.findOne({user_id:userId})
     if(!channel){
-        return res.status(400).send( new ApiResponse(400, "Please create a channel"));
+        throw new ApiError(400, "Please create a channel");
     }
 
 
 
     if(!(video.user_id.equals(channel.user_id) && channel._id.equals( video.channel_id)) ){
-        return res.status(400).send( new ApiResponse(400, "only the owner can change details of the video"));
+       throw new ApiError(400, "only the owner can change details of the video");
     }
     else{
         try{
@@ -122,7 +132,7 @@ const updateVideoDetails = async(req,res)=>{
         
     }
     catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }}
 }
 
@@ -133,17 +143,17 @@ const updateThumbnail = async(req,res)=>{
     const userId = new mongoose.Types.ObjectId(req.userId);
     const channel = await Channels.findOne({user_id:userId})
     if(!channel){
-        return res.status(400).send( new ApiResponse(400, "Please create a channel"));
+        throw new ApiError(400, "Please create a channel");
     }
     const video = await Videos.findById(new mongoose.Types.ObjectId(videoId));
 
     if(!video){
-        return res.status(400).send( new ApiResponse(400, "Video does not exist"));
+       throw new ApiError(400, "Video does not exist");
     }
 
 
     if(!(video.user_id.equals(channel.user_id) && channel._id.equals(video.channel_id)) ){
-        return res.status(400).send( new ApiResponse(400, "only the owner can change details of the video"));
+        throw new ApiError(400, "only the owner can change details of the video");
     }
     else{
         try{
@@ -162,7 +172,7 @@ const updateThumbnail = async(req,res)=>{
         
     }
     catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }}
 }
 
@@ -175,12 +185,12 @@ const likeDislikeVideo = async(req,res)=>{
         
         const video = await Videos.findById(new mongoose.Types.ObjectId(videoId));
         if(!video){
-            return res.status(504).send(new ApiResponse(504,"Video not Found"));
+            throw new ApiError(504,"Video not Found");
         }
 
         const userDetails = await UserOtherDetails.findOne({"user_id":new mongoose.Types.ObjectId(userId)});
         if(!userDetails){
-            return res.status(504).send(new ApiResponse(504,"User Details not found"));            
+            throw new ApiError(504,"User Details not found");           
         }
 
         
@@ -228,7 +238,7 @@ const likeDislikeVideo = async(req,res)=>{
 
     }catch(err){
 
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -243,24 +253,24 @@ const removeVideo = async(req,res)=>{
 
     
     if(!video){
-        return res.status(404).send(new ApiResponse(404,"Video does not exist"));
+        throw new ApiError(404,"Video does not exist");
     }
 
     const channel = await Channels.findOne({user_id:user._id});
     
     if(!channel){
-        return res.status(404).send(new ApiResponse(404,"channel does not exist"));
+        throw new ApiError(404,"channel does not exist");
     }
 
     if(!(video.user_id.equals(user._id)) || !(channel._id.equals(video.channel_id))){
-        return res.status(401).send(new ApiResponse(401,"You are not the Owner of this video"));
+        throw new ApiError(401,"You are not the Owner of this video");
     }
 
     try{
 
         
         if(!channel){
-            return res.status(404).send(new ApiResponse(404,"channel does not exist"));
+            throw new ApiError(404,"channel does not exist");
         }
 
         channel.totalViewCount -= video.views;
@@ -281,7 +291,7 @@ const removeVideo = async(req,res)=>{
         return res.status(200).send(new ApiResponse(200,"Video Deleted Successfully"));
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 
 
@@ -296,12 +306,12 @@ const getVideoDetails = async(req,res)=>{
 
 
     if(!video  ){
-        return res.status(400).send( new ApiResponse(400, "Video does not exist"));
+        throw new ApiError(400, "Video does not exist");
     }
 
     const channel = await Channels.findById(new mongoose.Types.ObjectId(video.channel_id));
     if(!channel){
-        return res.status(500).send(new ApiResponse(500,"Internal server Error"));
+        throw new ApiError(500,"Internal server Error");
     }
     const dataToSend= {
         "videoUrl" : video.videoUrl,
@@ -328,7 +338,7 @@ const getVideoDetails = async(req,res)=>{
     if(req.userId){
         
         if(video.visibility.toLowerCase()=="private" && (!(new mongoose.Types.ObjectId(req.userId)).equals(video.user_id)) ){
-            return res.status(401).send(new ApiResponse(401,"This is a private video"));
+            throw new ApiError(401,"This is a private video");
         }
 
         const userDetails = await UserOtherDetails.findOne({user_id:new mongoose.Types.ObjectId(req.userId)});
@@ -349,7 +359,7 @@ const getVideoDetails = async(req,res)=>{
     
    
     if((video.visibility.toLowerCase() =="private" && !req.userId)){
-        return res.status(401).send(new ApiResponse(401,"This is a private video"))
+        throw new ApiError(401,"This is a private video")
     }
 
     try{
@@ -361,7 +371,7 @@ const getVideoDetails = async(req,res)=>{
         return res.status(200).send(new ApiResponse(200,"video Details attached",dataToSend));
 
     }catch(err){
-        return res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 
     
@@ -372,11 +382,11 @@ const getAllVideos = async(req,res)=>{
     const channelUserName = req.params.userName;
 
     if(!channelUserName){
-        return res.status(400).send(new ApiResponse(400,"Please attach channelUserName"))
+        throw new ApiError(400,"Please attach channelUserName")
     }
     const channel = await Channels.findOne({channelUserName:channelUserName});
     if(!channel){
-        return res.status(400).send( new ApiResponse(400, "Channel Does not exist"));
+        throw new ApiError(400, "Channel Does not exist");
     }
     let owner = false;
     if(req.userId){
@@ -422,10 +432,10 @@ const getAllVideos = async(req,res)=>{
             }
         })
 
-        res.status(200).send(new ApiResponse(200,"All videos retrived successfully",videosData));
+        return res.status(200).send(new ApiResponse(200,"All videos retrived successfully",videosData));
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+       throw new ApiError(500,err.message);
     }
 
 
@@ -438,7 +448,7 @@ const searchVideos = async(req,res)=>{
     const limit = parseInt(req.query.limit) || 10;
 
     if(!searchQuery){
-        return res.status(200).send(new ApiResponse(200, "No search query"));
+        throw new ApiError(200, "No search query");
     }
     
     try{
@@ -494,7 +504,7 @@ const searchVideos = async(req,res)=>{
     
     }catch(err){
         console.log(err);
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -502,7 +512,7 @@ const searchVideos = async(req,res)=>{
 const searchSuggestions = async(req,res)=>{
     const searchQuery = req.query.searchQuery?.trim();
     if(!searchQuery){
-        return res.status(200).send(new ApiResponse(200,"no query found"));
+        throw new ApiError(200,"no query found");
     }
     try{
 
@@ -535,7 +545,7 @@ const searchSuggestions = async(req,res)=>{
 
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -587,7 +597,7 @@ const randomVideosSuggestions = async(req,res)=>{
 
         
     }catch(err){
-        res.status(500).send(new ApiResponse(500,err.message));
+        throw new ApiError(500,err.message);
     }
 }
 
@@ -634,7 +644,7 @@ const trendingVideos = async(req,res)=>{
     res.status(200).send(new ApiResponse(200,"Trending Videos", videoList));
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500, err.message));
+        throw new ApiError(500, err.message);
     }
 }
 
@@ -681,7 +691,7 @@ const latestVideos = async(req,res)=>{
     res.status(200).send(new ApiResponse(200,"Latest Videos", videoList));
 
     }catch(err){
-        res.status(500).send(new ApiResponse(500, err.message));
+        throw new ApiError(500, err.message);
     }
 }
 
