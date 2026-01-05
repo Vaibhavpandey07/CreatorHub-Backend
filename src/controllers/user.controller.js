@@ -6,7 +6,7 @@ import { generateToken } from "../utlis/generateTokens.util.js";
 import  jwt from "jsonwebtoken"
 import { Channels } from "../models/Channels.model.js";
 import mongoose from "mongoose";
-import { withTransaction } from "../utlis/withTransaction.util.js";
+// import { withTransaction } from "../utlis/withTransaction.util.js";
 import fs from "fs/promises"
 import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
 import { Subscriptions } from "../models/Subscriptions.model.js";
@@ -20,6 +20,7 @@ import { createAvatar } from "../services/createAvatar.service.js";
 
 const registration = async(req,res) =>{
     const err = validationResult(req);
+
     
     if(err.isEmpty()){
         const found = await Users.findOne({email:req.body.email});
@@ -105,7 +106,7 @@ const login = async(req,res)=>{
     }
 
     if(!user.isEmailVerified){
-         throw new ApiError(400,`Please verify your Email`,[],{"email":{"check":false , "message" : "Verify your Email"}});
+         throw new ApiError(403,`Please verify your Email`,[],{"email":{"check":false , "message" : "Verify your Email"}});
     }
 
     try{
@@ -210,21 +211,52 @@ const updateProfilePhoto =async(req,res)=>{
         throw new ApiError(400,"Please upload Image");
     }
     try{
-        await withTransaction(async(session)=>{
-            const oldProfilePhoto = user.profilePhoto;
-            await Users.findByIdAndUpdate({_id:req.userId},{$set:{'profilePhoto':`${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`}} , {session})
-            const channel = await Channels.findOne({user_id:new mongoose.Types.ObjectId(req.userId)})
-            if(channel){
-                channel.profilePhoto = `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`;
-                await channel.save({validationBeforeSave :false},{session});
-            }
-            try{
-                await fs.unlink(oldProfilePhoto)
-            }catch(err){
-                console.log(err);
-            }
-            return res.status(200).send(new ApiResponse(200,"User Profile Photo Updated Successfully"))
-        })
+
+        let inputImagePath = "";
+        let outputImagePath = "";
+        if(req.fileName){
+            inputImagePath = `${env.UPLOAD_PROFILE_PHOTO_FOLDER}/${req.fileName[0]?.name}`
+            outputImagePath = `${env.UPLOAD_AVATAR_FOLDER}/${req.fileName[0]?.name}`
+
+        }
+
+         await createAvatar(inputImagePath, outputImagePath).then(()=>{
+                    
+            fs.unlink(inputImagePath, (err) => {
+                if (err) {
+                    console.error("Failed to delete original file:", err);
+                } 
+                else {
+                    console.log("Original file deleted:", inputImagePath);
+                }
+                });
+            } 
+        );
+
+
+        const oldProfilePhoto = user.profilePhoto;
+        await Users.findByIdAndUpdate({_id:req.userId},{$set:{'profilePhoto':outputImagePath}} )
+        const channel = await Channels.findOne({user_id:new mongoose.Types.ObjectId(req.userId)})
+        if(channel){
+            channel.profilePhoto = outputImagePath;
+            await channel.save({validationBeforeSave :false},{session});
+        }
+        try{
+            await fs.unlink(oldProfilePhoto,
+                (err) => {
+                if (err) {
+                    console.error("Failed to delete original file:", err);
+                } 
+                else {
+                    console.log("Original file deleted:", oldProfilePhoto);
+                }
+                });
+
+        }catch(err){
+            console.log(err);
+        }
+        return res.status(200).send(new ApiResponse(200,"User Profile Photo Updated Successfully",{'profilePhoto':outputImagePath}))
+       
     }
     catch(err){
         throw new ApiError(500,err.message);
