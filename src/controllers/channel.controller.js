@@ -29,8 +29,13 @@ const createChannel = async(req,res)=>{
     }
     
     const channelWithUserName = await Channels.findOne({channelUserName : channelUserName});
+    const channelWithUserId = await Channels.findOne({user_id : user._id});
+
     if(channelWithUserName){
-        throw new ApiError(400, "channel user Name already taken please try a different User Name");
+        throw new ApiError(409, "channel user Name already taken please try a different User Name");
+    }
+    if(channelWithUserId){
+        throw new ApiError(422, "User already have a channel",[],{channelUserName : channelWithUserId.channelUserName});
     }
     
     
@@ -56,10 +61,11 @@ const createChannel = async(req,res)=>{
         }
 
         // await withTransaction(async(session)=>{
-            await Channels.create([dataToSave], { });
+            const channel = await Channels.create([dataToSave], { });
+            
             user.userType = 2;
             await user.save({validationBeforeSave :false} , {});
-            return res.status(201).send(new ApiResponse(201, "Channel Created Successfully"));
+            return res.status(201).send(new ApiResponse(201, "Channel Created Successfully",{channelUserName:channel[0].channelUserName}));
         // })
 
 

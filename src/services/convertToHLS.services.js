@@ -92,6 +92,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import fs from "fs";
 import path from "path";
+import { UploadedVideos } from "../models/UploadedVideos.model.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -103,8 +104,8 @@ class videoToHLS {
         this.err= false;
         this.end =false;
     };
-  async convertToHLS(inputPath, outputDir) {
-    
+  async convertToHLS(videoId,inputPath, outputDir) {
+
 
       // CREATE DIRECTORIES FIRST
       ["1080p", "720p", "480p"].forEach(dir => {
@@ -121,6 +122,10 @@ class videoToHLS {
         ];
 
     for (const r of renditions) {
+        const uploadVideoDetails = await UploadedVideos.findById(videoId)
+        let lastSavedProgress = uploadVideoDetails.processingPercentage;
+         let thisVideoPercent =0;
+
     await new Promise((resolve, reject) => {
         ffmpeg(inputPath)
         .videoCodec("libx264")
@@ -139,9 +144,24 @@ class videoToHLS {
                 this.start = true;
                 // console.log("FFmpeg started:", command);
             })
-        .on("progress", progress => {
-                this.progress = progress.percent?.toFixed(2);
-                console.log(`Processing: ${progress.percent?.toFixed(2)}%`);
+        .on("progress", async(progress) => {
+
+            const current = Math.floor(progress.percent);
+
+            const percentDiff = current - thisVideoPercent;
+    
+            if (percentDiff >= 9 || current === 100) {
+
+                thisVideoPercent = current;
+                
+
+                await UploadedVideos.updateOne(
+                { _id: videoId },
+                {
+                    processingPercentage: Math.floor(lastSavedProgress+(current/renditions.length)),
+                }
+                );
+            }
             })
         .on("end", () => {
             this.end = true,
@@ -170,7 +190,12 @@ class videoToHLS {
     fs.writeFileSync(`${outputDir}/master.m3u8`, master.trim());
 
 
-
+    await UploadedVideos.updateOne(
+    { _id: videoId },
+    {
+        processingPercentage: 100,
+    }
+    );
 
      
     

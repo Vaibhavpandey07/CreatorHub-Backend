@@ -11,8 +11,7 @@ import { UserOtherDetails } from "../models/UserOtherDetails.model.js";
 import fs from "fs";
 import { Comments } from "../models/Comments.model.js";
 import ApiError from "../utlis/ApiErrors.util.js";
-
-
+import { UploadedVideos } from "../models/UploadedVideos.model.js";
 
 
 
@@ -27,8 +26,6 @@ const uploadVideo = async(req,res)=>{
         throw new ApiError(400, "Please upload video");
     }
 
-
-    // let thumbnailPath = `${env.UPLOAD_THUMBNAIL_FOLDER}/` ;
     let videoDetails = {};
     let thumbnailDetails = {};
     
@@ -51,6 +48,109 @@ const uploadVideo = async(req,res)=>{
     const dataToSave = {
         "user_id" : new mongoose.Types.ObjectId(channel.user_id) ,
         "channel_id" : new mongoose.Types.ObjectId(channel._id) ,
+        "videoInputPath" : `${videoInputPath}`,
+        "videoOutputPath" : `${videoOutputPath}`,
+        "processingPercentage" : 0,
+        
+    }
+
+    try{
+        const video = await UploadedVideos.create(dataToSave);
+
+        try{
+            try{
+    
+                const videoConvertToHLS = new videoToHLS;
+    
+                videoConvertToHLS.convertToHLS(video._id ,videoInputPath,videoOutputPath).then(() =>{
+                    fs.unlink(videoInputPath, (err) => {
+                    if (err) {
+                    console.error("Failed to delete original file:", err);
+                    } else {
+                    console.log("Original file deleted:", videoInputPath);
+                    }
+                    });
+                })
+
+            }catch(err){
+                console.log(err.message);   
+                }
+
+
+
+            return res.status(201).send(new ApiResponse(201,`Video uploaded successfully and now it is being processed`,{"videoId":video._id, "processingPercentage": video.processingPercentage}))
+
+        }catch(err){
+            throw new ApiError(500,err.message);
+
+        }
+
+    }
+    catch(err){
+        throw new ApiError(500,err.message);
+    }
+
+}
+
+const getProgress =async(req,res)=>{
+    const videoId = req.body.videoId;
+
+    const uploadVideoDetails = await UploadedVideos.findById(videoId)
+    if(!uploadVideoDetails){
+       throw new ApiError(404, "Video Not Found");
+    }
+
+    if(!((new mongoose.Types.ObjectId(uploadVideoDetails.user_id)).equals(new mongoose.Types.ObjectId(req.userId)) )){
+        throw new ApiError(401,"You are not Authorized");
+    }
+    try{
+        return res.status(200).send(new ApiResponse(200,"success" ,{"processingPercentage":uploadVideoDetails.processingPercentage}));
+    }
+    catch(err){
+        throw new ApiError(500,err.message)
+    }
+
+}
+
+
+
+
+
+
+const VideoDetails = async(req,res)=>{
+    const userId = new mongoose.Types.ObjectId(req.userId);
+    const videoId = req.body.videoId;
+    
+    
+    const uploadVideoDetails = await UploadedVideos.findById(videoId)
+    if(!uploadVideoDetails){
+       throw new ApiError(404, "Video Not Found");
+    }
+
+    if(!((new mongoose.Types.ObjectId(uploadVideoDetails.user_id)).equals(userId) )){
+        throw new ApiError(401,"You are not Authorized");
+    }
+
+
+
+
+    const channel = await Channels.findOne({user_id:userId})
+    if(!channel){
+        throw new ApiError(400, "Please create a channel to Upload Videos");
+    }
+    if(!req.fileName){
+        throw new ApiError(400, "Please upload Thumbnail");
+    }
+
+
+    let thumbnailDetails = req.fileName[0];
+    
+
+    const videoOutputPath = uploadVideoDetails.videoOutputPath;
+
+    const dataToSave = {
+        "user_id" : new mongoose.Types.ObjectId(channel.user_id) ,
+        "channel_id" : new mongoose.Types.ObjectId(channel._id) ,
         "videoUrl" : `${videoOutputPath}/master.m3u8`,
         "videoPath" : `${videoOutputPath}`,
         "thumbnail" : `${env.UPLOAD_THUMBNAIL_FOLDER}/${thumbnailDetails.name}`,
@@ -67,23 +167,12 @@ const uploadVideo = async(req,res)=>{
         "tags":req.body?.tags //array
     }
     try{
-        const video = await Videos.create(dataToSave);
+         await Videos.create(dataToSave);
 
         try{
-            const videoConvertToHLS = new videoToHLS;
-    
-            videoConvertToHLS.convertToHLS(videoInputPath,videoOutputPath).then(() =>{
-            fs.unlink(videoInputPath, (err) => {
-                if (err) {
-                console.error("Failed to delete original file:", err);
-                } else {
-                console.log("Original file deleted:", videoInputPath);
-                }
-            });
-                
-            console.log("Done")}).catch(console.error);
 
-            return res.status(201).send(new ApiResponse(201,`Video uploaded successfully and now it is being processed`,{"videoURL":dataToSave.videoUrl}))
+            return res.status(201).send(new ApiResponse(201,`Video uploaded successfully and now it is live`,{"videoURL":dataToSave.videoUrl}))
+
         }catch(err){
             throw new ApiError(500,err.message);
 
@@ -281,9 +370,15 @@ const removeVideo = async(req,res)=>{
 
         try{
             fs.rm(video.videoPath, { recursive: true, force: true });
-            fs.unlink(video.thumbnail);
-        }catch(err){
+            fs.unlink(video.thumbnail, (err) => {
+                    if (err) {
                     console.error("Failed to delete original file:", err);
+                    } else {
+                    console.log("Original file deleted:", video.thumbnail);
+                    }
+                    });
+        }catch(err){
+                    console.error("Failed to delete original file:", err); 
 
         }
             
@@ -695,4 +790,4 @@ const latestVideos = async(req,res)=>{
     }
 }
 
-export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo, searchVideos , searchSuggestions,randomVideosSuggestions  , trendingVideos, latestVideos }
+export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo, searchVideos , searchSuggestions,randomVideosSuggestions  , trendingVideos, latestVideos, getProgress ,VideoDetails  }
