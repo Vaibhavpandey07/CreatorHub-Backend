@@ -112,11 +112,6 @@ const getProgress =async(req,res)=>{
 
 }
 
-
-
-
-
-
 const VideoDetails = async(req,res)=>{
     const userId = new mongoose.Types.ObjectId(req.userId);
     const videoId = req.body.videoId;
@@ -167,11 +162,11 @@ const VideoDetails = async(req,res)=>{
         "tags":req.body?.tags //array
     }
     try{
-         await Videos.create(dataToSave);
+        const video = await Videos.create(dataToSave);
 
         try{
 
-            return res.status(201).send(new ApiResponse(201,`Video uploaded successfully and now it is live`,{"videoURL":dataToSave.videoUrl}))
+            return res.status(201).send(new ApiResponse(201,`Video uploaded successfully and now it is live`,{"videoId":video._id}))
 
         }catch(err){
             throw new ApiError(500,err.message);
@@ -266,7 +261,7 @@ const updateThumbnail = async(req,res)=>{
 }
 
 
-const likeDislikeVideo = async(req,res)=>{
+const likeVideo = async(req,res)=>{
     const userId = req.userId;
     const check = req.body.liked;
     try{
@@ -286,20 +281,19 @@ const likeDislikeVideo = async(req,res)=>{
 
         if( (check && ( userDetails.likedVideos.some(id=>{
             return id.equals(new mongoose.Types.ObjectId(video._id));}
-        )) )|| (!check && (userDetails.disLikedVideos.some(id=>{
-            return id.equals(new mongoose.Types.ObjectId(video._id));}) ))){
-            return res.status(200).send(new ApiResponse(200,check?"Video already Liked":"Video already disliked"),{"like":check});
+        )) ) ){
+            return res.status(409).send(new ApiResponse(409,"Video already Liked",{"like":check}));
         }
 
         else if( !check && (userDetails.likedVideos.some(id=>{
             return id.equals(new mongoose.Types.ObjectId(video._id));}
         ) )){
             video.likes-=1;
-            video.dislikes+=1;
-            await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$pull:{likedVideos:video._id}, $addToSet: { disLikedVideos: video._id } }, {upsert: false});
+            await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$pull:{likedVideos:video._id}}, {upsert: false});
+
             await video.save({validateBeforeSave:false});
 
-            return res.status(200).send(new ApiResponse(200,"Video disliked"),{"like":check});
+            return res.status(200).send(new ApiResponse(200,"Video unliked"),{"like":check});
 
         }
         else if( check && (userDetails.disLikedVideos.some(id=>{
@@ -313,23 +307,95 @@ const likeDislikeVideo = async(req,res)=>{
             return res.status(200).send(new ApiResponse(200,"Video liked"),{"like":check});
 
         }
-        else{
+        else if(check){
 
             
-            check?video.likes +=1:video.dislikes+=1;
+            video.likes +=1;
             await video.save({validateBeforeSave:false});
-            check?userDetails.likedVideos.push(new mongoose.Types.ObjectId(video._id)):userDetails.disLikedVideos.push(new mongoose.Types.ObjectId(video._id));
+            userDetails.likedVideos.push(new mongoose.Types.ObjectId(video._id));
             await userDetails.save({validateBeforeSave:false});
+            return res.status(200).send(new ApiResponse(200,"Video Liked",{"like":check}));
             
-            return res.status(200).send(new ApiResponse(200,check?"Video Liked":"Video disliked"),{"like":check});
-            
+        }
+        else{
+           throw new ApiError(400,"Bad Request");;
         }
 
     }catch(err){
 
-        throw new ApiError(500,err.message);
+        throw new ApiError(err.statusCode || 500,err.message);
     }
 }
+
+
+const dislikeVideo = async(req,res)=>{
+    const userId = req.userId;
+    const check = req.body.disliked;
+    try{
+        const videoId = req.body.videoId;
+        
+        const video = await Videos.findById(new mongoose.Types.ObjectId(videoId));
+        if(!video){
+            throw new ApiError(504,"Video not Found");
+        }
+
+        const userDetails = await UserOtherDetails.findOne({"user_id":new mongoose.Types.ObjectId(userId)});
+        if(!userDetails){
+            throw new ApiError(504,"User Details not found");           
+        }
+
+        
+
+        if( (check && ( userDetails.disLikedVideos.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(video._id));}
+        )) ) ){
+            return res.status(409).send(new ApiResponse(409,"Video already disliked",{"dislike":check}));
+        }
+
+        else if( !check && (userDetails.disLikedVideos.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(video._id));}
+        ) )){
+            video.dislikes-=1;
+            await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$pull:{disLikedVideos:video._id}}, {upsert: false});
+
+            await video.save({validateBeforeSave:false});
+
+            return res.status(200).send(new ApiResponse(200,"Video unDisliked"),{"dislike":check});
+
+        }
+
+
+        else if( check && (userDetails.likedVideos.some(id=>{
+            return id.equals(new mongoose.Types.ObjectId(video._id));})) ){
+
+            video.likes-=1;
+            video.dislikes+=1;
+            await UserOtherDetails.findOneAndUpdate({"user_id":new mongoose.Types.ObjectId(userId)} , {$pull:{likedVideos:video._id}, $addToSet: { disLikedVideos: video._id } }, {upsert: false});
+            await video.save({validateBeforeSave:false});
+
+            return res.status(200).send(new ApiResponse(200,"Video disliked"),{"dislike":check});
+
+        }
+        else if(check){
+
+            
+            video.dislikes +=1;
+            await video.save({validateBeforeSave:false});
+            userDetails.disLikedVideos.push(new mongoose.Types.ObjectId(video._id));
+            await userDetails.save({validateBeforeSave:false});
+            return res.status(200).send(new ApiResponse(200,"Video disliked",{"dislike":check}));
+            
+        }
+        else{
+            throw new ApiError(400,"Bad Request");
+        }
+
+    }catch(err){
+
+        throw new ApiError(err.statusCode || 500,err.message);
+    }
+}
+
 
 
 const removeVideo = async(req,res)=>{
@@ -428,6 +494,8 @@ const getVideoDetails = async(req,res)=>{
         "totalSubscriberCount" :channel.totalSubscriberCount,
         "liked":false,
         "disliked":false,
+        "subscribe":false,
+        "video_id" :videoId,
     }
     
     if(req.userId){
@@ -437,17 +505,46 @@ const getVideoDetails = async(req,res)=>{
         }
 
         const userDetails = await UserOtherDetails.findOne({user_id:new mongoose.Types.ObjectId(req.userId)});
+
         if(userDetails.likedVideos.some(id=>{ return id.equals(new mongoose.Types.ObjectId(video._id))})){
             dataToSend.liked = true;
         }
         else if(userDetails.disLikedVideos.some(id=>{ return id.equals(new mongoose.Types.ObjectId(video._id))})){
             dataToSend.disliked = true;
         }
+
+        if(userDetails.subscribedTo.some(id=>{return id.equals(new mongoose.Types.ObjectId(channel._id))})){
+            dataToSend.subscribe = true;
+        }
+        if((new mongoose.Types.ObjectId(req.userId)).equals(video.user_id) ){
+            dataToSend.owner = true;
+
+        }
         await UserOtherDetails.findOneAndUpdate({_id:userDetails._id},{
-            $addToSet:{watchHisttory : new mongoose.Types.ObjectId(video._id)}
+            $addToSet:{watchHistory : new mongoose.Types.ObjectId(video._id)}
         })
-        // userDetails.watchHisttory.push();
-        await userDetails.save({validationBeforeSave:false});
+        const updated = await UserOtherDetails.findOneAndUpdate(
+                        { _id: userDetails._id, "watchHistory.video": video._id},
+                        {$set: {
+                            "watchHistory.$.updatedAt": new Date()
+                            }
+                        },
+                        { new: true }
+                        );
+
+        if (!updated) 
+        {
+            await UserOtherDetails.findOneAndUpdate({ _id: userDetails._id },
+                {
+                $push: {
+                    watchHistory: {
+                    video: video._id,
+                    updatedAt: new Date()
+                    }
+                }
+                }
+            );
+            }
 
     }
     
@@ -475,6 +572,14 @@ const getVideoDetails = async(req,res)=>{
 
 const getAllVideos = async(req,res)=>{
     const channelUserName = req.params.userName;
+    const query = `${req.query.query?.trim()}`;
+    const page = parseInt(req.query.page)|| 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    let sortBy = {$sort:{createdAt:-1}};
+    if( query =='popular'){
+        sortBy = {$sort:{views:-1}};
+    }
 
     if(!channelUserName){
         throw new ApiError(400,"Please attach channelUserName")
@@ -490,57 +595,65 @@ const getAllVideos = async(req,res)=>{
             owner = true;
         }
     }
-    try{
-        const allVideos = await Videos.find({channel_id:channel._id});
-
-        let videosData = [];
+        try{
+        const skip = (page-1)*limit;
 
 
 
-        allVideos.forEach(async(video)=>{
-            
-            const data = {
-                "video_id":video._id,
-                // "channel_id" : video.channel_id ,
-                // "videoUrl" : video.videoUrl,
-                "thumbnail" : video.thumbnail,
-                "title" : video.title,
-                "description" : video.description,
-                "category" : video.category,
-                "language" : video.language,
-                "dateUploaded" : video.dateUploaded,
-                "location" : video.location,
-                "views":video.views,
-                "likes":video.likes,
-                "dislikes" : video.dislikes,
-                "channelName" : channel.channelName,
-                "channelDescription" : channel.description,
-                "channelUserName" : channel.channelUserName,
-                "profilePhoto" :channel.profilePhoto,
-                "totalSubscriberCount" :channel.totalSubscriberCount
+        const searchResults = await Videos.aggregate([
+            {$match: { channel_id:channel._id , visibility:"public"}  },
+            sortBy,
+            {$skip :skip},
+            {$limit : limit+1},
+
+            {$project : {
+                _id:0,
+                video_id: "$_id",
+                thumbnail:1,
+                title:1,
+                description:1,
+                category:1,
+                language:1,
+                dateUploaded:1,
+                location:1,
+                views:1,
+                likes:1,
+                dislikes:1,
+                channelName :`${channel.channelName}`,
+                channelDescription : `${channel.description}`,
+                channelUserName : `${channel.channelUserName}`,
+                profilePhoto : `${channel.profilePhoto}`,
+                totalSubscriberCount : `${channel.totalSubscriberCount}`
             }
-            if(video.visibility.toLowerCase() =="private" && owner){
-                videosData.push(data);
-            }
-            else if(video.visibility.toLowerCase()=="public"){
-                videosData.push(data);
-            }
-        })
 
-        return res.status(200).send(new ApiResponse(200,"All videos retrived successfully",videosData));
+            }
+        ]
+    )
 
+
+        const hasMore = searchResults.length>limit?true:false;
+        if(hasMore){searchResults.pop()};
+
+
+
+        res.status(200).send(new ApiResponse(200,(searchResults.length>0)?"Search Results found":"Search Results not Found",{"data" : searchResults,"hasMore":hasMore,page,limit}));
+        
+    
     }catch(err){
-       throw new ApiError(500,err.message);
+        console.log(err);
+        throw new ApiError(500,err.message);
     }
 
 
-
 }
+
 
 const searchVideos = async(req,res)=>{
     const searchQuery = `${req.query.searchQuery?.trim()}`;
     const page = parseInt(req.query.page)|| 1;
     const limit = parseInt(req.query.limit) || 10;
+
+    
 
     if(!searchQuery){
         throw new ApiError(200, "No search query");
@@ -556,7 +669,7 @@ const searchVideos = async(req,res)=>{
             {$addFields : {score :{$meta:"textScore"}}},
             {$sort :{score:-1}},
             {$skip :skip},
-            {$limit : 10},
+            {$limit : limit+1},
 
             {$lookup : {
                 from : "channels",
@@ -592,9 +705,12 @@ const searchVideos = async(req,res)=>{
     )
 
 
+        const hasMore = searchResults.length>limit?true:false;
+        if(hasMore){searchResults.pop()};
 
 
-        res.status(200).send(new ApiResponse(200,(searchResults.length>0)?"Search Results found":"Search Results not Found",{"results" : searchResults,"hasMore":searchResults.length===limit,page,limit}));
+
+        res.status(200).send(new ApiResponse(200,(searchResults.length>0)?"Search Results found":"Search Results not Found",{"data" : searchResults,"hasMore":hasMore,page,limit}));
         
     
     }catch(err){
@@ -613,23 +729,26 @@ const searchSuggestions = async(req,res)=>{
 
         const results = await Videos.aggregate([
             {
-                // $search :{
-                // index :"autoComplete",
-                // autoComplete :{
-                //     query:searchQuery,
-                //     path:"title",
-                //     fuzzy : {maxEdits:1}
-                //     }
-                // }
-                $match :{title : {$regex : `^${searchQuery}` , $options:"i" },
-                        visibility:"public"
-                        }
+
+                $match : {$and:[{$or:[{
+                    title : {$regex : `^${searchQuery}` , $options:"i"} 
+                },{
+                    description : {$regex: `^${searchQuery}`,$options:'i'}
+                },
+                {
+                    tags : {$regex: `^${searchQuery}`,$options:'i'}
+                }
+            ], visibility:'public'}]}
+                
+                // {title : {$regex : `^${searchQuery}` , $options:"i" },
+                //         visibility:"public"}
 
             },
 
             {$limit:5},
             {$project : {
-                _id:1,
+                _id:0,
+                video_id:'$_id',
                 title:1
             }}
 
@@ -645,14 +764,21 @@ const searchSuggestions = async(req,res)=>{
 }
 
 
-
 const randomVideosSuggestions = async(req,res)=>{
+    const {limit=5 , cursor } = req.query;
+    const q = {visibility:"public"}
+
+    if(cursor){
+        q._id = {$lt : new mongoose.Types.ObjectId(cursor)};
+    }
     try{
         
 
-        const videoResults = await Videos.aggregate([
-            {$match:{visibility:"public"}},
-            {$sample :{size:10}},
+        let videoResults = await Videos.aggregate([
+            {$match:q},
+            {$sort : {_id : -1}},
+
+            {$limit :parseInt(limit)+1},
         
             {$lookup : {
                 from : "channels",
@@ -664,7 +790,7 @@ const randomVideosSuggestions = async(req,res)=>{
             {$unwind :"$channel"},
        
             {$project : {
-                _id:0,
+                _id:1,
                 video_id: "$_id",
                 thumbnail:1,
                 title:1,
@@ -680,28 +806,47 @@ const randomVideosSuggestions = async(req,res)=>{
                 channelDescription : "$channel.description",
                 channelUserName : "$channel.channelUserName",
                 profilePhoto : "$channel.profilePhoto",
-                totalSubscriberCount : "$channel.totalSubscriberCount"
+                totalSubscriberCount : "$channel.totalSubscriberCount",
+                
             }
 
             }
         ]
     )
+        // if(!videoResults){throw err}
+
+        const hasMore = videoResults.length>limit?true:false;
+        if(hasMore){videoResults.pop()};
+        const newCursor = hasMore?videoResults[videoResults.length -1]._id:null;
+
+        videoResults = videoResults.map((ele)=>{
+            const {_id,...obj} = ele;
+            return obj;
+        })
 
         
-        res.status(200).send(new ApiResponse(200,"Results found", videoResults));
+        res.status(200).send(new ApiResponse(200,"Results found", {data:videoResults,hasMore,newCursor}));
 
         
     }catch(err){
+        
         throw new ApiError(500,err.message);
     }
 }
 
-const trendingVideos = async(req,res)=>{
+const latestVideos = async(req,res)=>{
+    const {limit=5,cursor} = req.query;
+    const q = {visibility:"public"}
+
+    if(cursor){
+        q.createdAt = {$lt : new Date(cursor)};
+    }
+
     try{    
-        const videoList = await Videos.aggregate([
-            {$match:{visibility:"public"}},
-            {$sort :{views:-1,createdAt:-1}},
-            {$limit : 20},
+        let videoList = await Videos.aggregate([
+            {$match:q},
+            {$sort :{createdAt:-1,_id:-1}},
+            {$limit : parseInt(limit)+1},
      
             {$lookup : {
                 from : "channels",
@@ -729,26 +874,55 @@ const trendingVideos = async(req,res)=>{
                 channelDescription : "$channel.description",
                 channelUserName : "$channel.channelUserName",
                 profilePhoto : "$channel.profilePhoto",
-                totalSubscriberCount : "$channel.totalSubscriberCount"
+                totalSubscriberCount : "$channel.totalSubscriberCount",
+                createdAt:"$createdAt"
             }
 
             }
         ]
     )
 
-    res.status(200).send(new ApiResponse(200,"Trending Videos", videoList));
+
+    // if(!videoList){throw err}
+
+    const hasMore = videoList.length>limit?true:false;
+    if(hasMore){videoList.pop()};
+    const newCursor = hasMore?videoList[videoList.length -1].createdAt:null;
+
+
+    videoList = videoList.map((ele)=>{
+        const {createdAt,...obj} = ele;
+        return obj;
+    })
+
+        
+    res.status(200).send(new ApiResponse(200,"Latest Videos", {data:videoList,hasMore,newCursor}));
+
+
 
     }catch(err){
         throw new ApiError(500, err.message);
     }
 }
 
-const latestVideos = async(req,res)=>{
+const trendingVideos = async(req,res)=>{
+
+    const {limit=5,cursor,cursorDate} = req.query;
+    const q = {visibility:"public"}
+
+    if(cursor){
+        q.views = {$lte : Number(cursor)};
+    }
+    if(cursorDate){
+        q.createdAt = {$lt: new Date(cursorDate)}
+    };
+
+
      try{    
-        const videoList = await Videos.aggregate([
-            {$match:{visibility:"public"}},
-            {$sort :{createdAt:-1,views:-1}},
-            {$limit : 20},
+        let videoList = await Videos.aggregate([
+            {$match:q},
+            {$sort :{views:-1,createdAt:-1}},
+            {$limit : parseInt(limit)+1},
        
             {$lookup : {
                 from : "channels",
@@ -776,18 +950,32 @@ const latestVideos = async(req,res)=>{
                 channelDescription : "$channel.description",
                 channelUserName : "$channel.channelUserName",
                 profilePhoto : "$channel.profilePhoto",
-                totalSubscriberCount : "$channel.totalSubscriberCount"
+                totalSubscriberCount : "$channel.totalSubscriberCount",
+                createdAt:"$createdAt"
             }
 
             }
         ]
     )
 
-    res.status(200).send(new ApiResponse(200,"Latest Videos", videoList));
+
+    const hasMore = videoList.length>limit?true:false;
+    if(hasMore){videoList.pop()};
+    const newCursor = hasMore?videoList[videoList.length -1].views:null;
+    const cursorDate = hasMore?videoList[videoList.length-1].createdAt:null;
+
+    videoList = videoList.map((ele)=>{
+        const {createdAt,...obj} = ele;
+        return obj;
+    })
+
+        
+    res.status(200).send(new ApiResponse(200,"Trending Videos", {data:videoList,hasMore,newCursor, cursorDate}));
 
     }catch(err){
         throw new ApiError(500, err.message);
     }
 }
 
-export {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo, searchVideos , searchSuggestions,randomVideosSuggestions  , trendingVideos, latestVideos, getProgress ,VideoDetails  }
+
+export {uploadVideo, updateVideoDetails , updateThumbnail ,likeVideo,dislikeVideo, getVideoDetails , getAllVideos , removeVideo, searchVideos , searchSuggestions,randomVideosSuggestions  , trendingVideos, latestVideos, getProgress , VideoDetails}

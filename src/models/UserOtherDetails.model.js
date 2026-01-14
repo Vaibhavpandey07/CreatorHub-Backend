@@ -6,7 +6,16 @@ import { Channels } from "./Channels.model.js";
 
 const userOtherDetailsSchema = new Schema({
     user_id :{type:String, required:true , ref:Users}, 
-    watchHisttory :[{type:Schema.Types.ObjectId, ref:Videos}],           
+    watchHistory :[
+      { video: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: Videos,
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
+        }
+    }],
     searchHistory :[{type:String}],     
     likedVideos :[{type:Schema.Types.ObjectId, ref:Videos}],
     disLikedVideos :[{type:Schema.Types.ObjectId, ref:Videos}],

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authToken } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 import { convertData } from "../middleware/convertData.middleware.js";
-import {uploadVideo, updateVideoDetails , updateThumbnail ,likeDislikeVideo, getVideoDetails , getAllVideos , removeVideo, searchVideos, searchSuggestions, randomVideosSuggestions, trendingVideos, latestVideos, VideoDetails, getProgress  } from "../controllers/video.controller.js";
+import {uploadVideo, updateVideoDetails , updateThumbnail ,likeVideo, dislikeVideo, getVideoDetails , getAllVideos , removeVideo, searchVideos, searchSuggestions, randomVideosSuggestions, trendingVideos, latestVideos, VideoDetails, getProgress  } from "../controllers/video.controller.js";
 import { optionalAuth } from "../middleware/optionalAuth.middleware.js";
 
 const router = Router();
@@ -18,7 +18,9 @@ router.post('/uploadVideoDetails',authToken,upload.single('thumbnail'),convertDa
 router.patch('/updateVideoDetails',authToken , updateVideoDetails);
 router.patch('/updateThumbnail',authToken,upload.single('thumbnail'),convertData , updateThumbnail);
 
-router.post('/likeDislikevideo',authToken , likeDislikeVideo);
+router.post('/likevideo',authToken , likeVideo);
+router.post('/dislikevideo',authToken , dislikeVideo);
+
 
 router.delete('/removeVideo',authToken , removeVideo);
 

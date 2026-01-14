@@ -64,7 +64,7 @@ const registration = async(req,res) =>{
 
 
                 const user = await Users.create(dataToSave);
-                await UserOtherDetails.create({"user_id" : new mongoose.Types.ObjectId(user._id) , "watchHisttory":[],"searchHistory":[] , "likedVideos":[],"disLikedVideos":[],"notification":[] , "subscribedTo":[]})
+                await UserOtherDetails.create({"user_id" : new mongoose.Types.ObjectId(user._id) , "watchHistory":[],"searchHistory":[] , "likedVideos":[],"disLikedVideos":[],"notification":[] , "subscribedTo":[]})
                 await  sendOtpEmail(dataToSave.email,otp);
 
 

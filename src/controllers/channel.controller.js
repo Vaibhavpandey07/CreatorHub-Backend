@@ -286,6 +286,10 @@ const getChannelDetails = async(req,res)=>{
             }else {
                 dataToSend.subscribe =false;
             }
+
+            if(new mongoose.Types.ObjectId(userDetails.user_id).equals(new mongoose.Types.ObjectId(channel.user_id))){
+                dataToSend.owner = true;
+            }
         }
         
         
@@ -362,10 +366,11 @@ const mostSubscribedChannels = async(req,res)=>{
             userDetails = await UserOtherDetails.findOne({user_id:new mongoose.Types.ObjectId(req.userId)});    
         }
         const channelResult = Channels.aggregate([
-            {$sort : {totalSubscriberCount : 1}},
+            {$sort : {totalSubscriberCount : -1}},
             {$limit : 20},
             {$project : {
-               
+            
+            user_id :1,
             channelName : 1 ,
             description :1,
             channelUserName : 1,
@@ -380,16 +385,23 @@ const mostSubscribedChannels = async(req,res)=>{
 
         const dataToSend = (await channelResult).map((channel)=>{
             if(userDetails){
-                console.log(userDetails.subscribedTo)
+                // console.log(userDetails.subscribedTo)
                 if(userDetails.subscribedTo.some((id)=>{
                     return id.equals(channel._id);
                 })){
                     channel.subscribe = true;
-                }else{
+                }
+                else{
                     channel.subscribe = false;
                 }
+                if(new mongoose.Types.ObjectId(userDetails.user_id).equals(new mongoose.Types.ObjectId(channel.user_id))){
+                    channel.owner = true;
+                }
+                
             }
             delete channel._id;
+            delete channel.user_id;
+
             return channel;
         })
 
