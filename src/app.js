@@ -10,11 +10,22 @@ import userOtherDetailsRouter from './routes/userOtherDetails.routes.js';
 import cookieParser from 'cookie-parser'
 import errorMiddleware from './middleware/error.middleware.js';
 
+
+ 
 dotenv.config({path:"./.env"})
 const app = express();
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS.split(",");
+
+
 app.use(cors({
-    origin : process.env.ALLOW_ORIGN,
+   origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS blocked"));
+      }
+    },
     credentials:true
 }));
 
